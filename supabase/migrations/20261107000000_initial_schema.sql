@@ -1,8 +1,13 @@
 -- =====================================================================
 -- JB Gadgets Store - database setup for Supabase
 -- =====================================================================
--- Paste this whole file into Supabase: SQL Editor -> New query -> Run.
--- It is safe to run more than once.
+-- This is a migration. With the GitHub integration switched on, it runs
+-- against the production database when a pull request is merged into
+-- main. It can also be pasted into SQL Editor -> New query -> Run.
+-- Either way it is safe to run more than once.
+--
+-- Later changes go in a NEW file in this folder, never as an edit to
+-- this one: a migration that has already run is not run again.
 --
 -- One shop, staff with their own logins, three roles:
 --   owner   - everything an admin can do, and invisible to everyone else.
