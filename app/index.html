@@ -1,0 +1,1653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>JB Gadgets Store - Store &amp; Repair Manager</title>
+    <meta name="description" content="JB Gadgets Store - stock, point of sale, returns, repairs and customers. Affordability &amp; Authenticity.">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="icon" href="../logo-mark.png">
+    <link rel="apple-touch-icon" href="../logo-mark.png">
+    <!-- Tailwind CSS, pinned to a fixed version -->
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <!-- Alpine.js, pinned to a fixed version -->
+    <!-- Supabase client, pinned -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+    <!-- Alpine.js (pinned). Loads last so the app script is defined first. -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        html, body { height: 100%; }
+        body { background: #f1f5f9; color: #1e293b; color-scheme: light; margin: 0; }
+        /* The sign-in and app screens measure against this wrapper, so it
+           has to be full height too or they stop part way down the page. */
+        .jb-root { height: 100%; }
+        .jb-screen { height: 100%; }
+        /* keep the fixed phone nav clear of the on-screen home bar */
+        .jb-bottomnav {
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            height: calc(4rem + env(safe-area-inset-bottom, 0px));
+        }
+        #jb-toast {
+            position: fixed; left: 50%; transform: translateX(-50%) translateY(10px);
+            bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+            background: #0f172a; color: #fff; padding: 10px 18px; border-radius: 999px;
+            font-size: 13px; font-weight: 500; z-index: 80; max-width: min(92vw, 420px); text-align: center;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, .28);
+            opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease;
+        }
+        #jb-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        @media (min-width: 768px) { #jb-toast { bottom: 1.75rem; } }
+        @media (prefers-reduced-motion: reduce) { #jb-toast { transition: none; } }
+        @media print {
+            body * { visibility: hidden; }
+            #printable-receipt, #printable-receipt * { visibility: visible; }
+            #printable-receipt {
+                position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 10px; box-shadow: none;
+            }
+            #jb-toast { display: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans">
+
+    <div class="jb-root" x-data="storeApp()" x-cloak>
+
+    <!-- ============ SIGN IN ============ -->
+    <div x-show="stage === 'loading'" class="jb-screen flex items-center justify-center bg-slate-100">
+        <p class="text-sm text-slate-500">Loading…</p>
+    </div>
+
+    <div x-show="stage === 'signin'" class="jb-screen flex items-center justify-center bg-slate-900 p-4">
+        <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-7 space-y-5">
+            <div class="text-center space-y-2">
+                <img src="../logo-mark.png" alt="JB Gadgets Store logo" class="h-16 w-auto mx-auto">
+                <h1 class="text-lg font-bold text-slate-900">JB GADGETS STORE</h1>
+                <p class="text-[10px] tracking-[0.14em] text-slate-400 font-medium">AFFORDABILITY &amp; AUTHENTICITY</p>
+            </div>
+            <form @submit.prevent="signIn()" class="space-y-3">
+                <div>
+                    <label for="jb-email" class="block text-xs font-semibold text-slate-600 mb-1">Email</label>
+                    <input id="jb-email" type="email" x-model="loginEmail" autocomplete="username" required
+                           class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="jb-password" class="block text-xs font-semibold text-slate-600 mb-1">Password</label>
+                    <input id="jb-password" type="password" x-model="loginPassword" autocomplete="current-password" required
+                           class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <p x-show="loginError" x-text="loginError" class="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2"></p>
+                <p x-show="loginNote" x-text="loginNote" class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2"></p>
+                <button type="submit" :disabled="busy"
+                        class="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 text-sm transition cursor-pointer"
+                        x-text="busy ? 'Signing in…' : 'Sign in'"></button>
+            </form>
+            <button @click="sendReset()" :disabled="busy"
+                    class="w-full text-xs text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50 cursor-pointer">
+                Forgot your password?
+            </button>
+            <p class="text-[11px] text-slate-400 text-center">No account? Ask the shop owner or an admin to set one up for you.</p>
+        </div>
+    </div>
+
+    <!-- ============ CHOOSE A NEW PASSWORD ============ -->
+    <!-- Reached from the link in a password recovery email. -->
+    <div x-show="stage === 'reset'" class="jb-screen flex items-center justify-center bg-slate-900 p-4">
+        <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-7 space-y-5">
+            <div class="text-center space-y-2">
+                <img src="../logo-mark.png" alt="JB Gadgets Store logo" class="h-14 w-auto mx-auto">
+                <h1 class="text-base font-bold text-slate-900">Choose a new password</h1>
+                <p class="text-xs text-slate-500">At least 8 characters.</p>
+            </div>
+            <form @submit.prevent="setNewPassword()" class="space-y-3">
+                <div>
+                    <label for="jb-new-password" class="block text-xs font-semibold text-slate-600 mb-1">New password</label>
+                    <input id="jb-new-password" type="password" x-model="newPassword" autocomplete="new-password" minlength="8" required
+                           class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="jb-new-password2" class="block text-xs font-semibold text-slate-600 mb-1">Type it again</label>
+                    <input id="jb-new-password2" type="password" x-model="newPassword2" autocomplete="new-password" minlength="8" required
+                           class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <p x-show="loginError" x-text="loginError" class="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2"></p>
+                <button type="submit" :disabled="busy"
+                        class="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 text-sm transition cursor-pointer"
+                        x-text="busy ? 'Saving…' : 'Save new password'"></button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============ SIGNED IN BUT NOT YET APPROVED ============ -->
+    <div x-show="stage === 'pending'" class="jb-screen flex items-center justify-center bg-slate-900 p-4">
+        <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-7 space-y-4 text-center">
+            <img src="../logo-mark.png" alt="JB Gadgets Store logo" class="h-14 w-auto mx-auto">
+            <h1 class="text-base font-bold text-slate-900">Waiting for approval</h1>
+            <p class="text-sm text-slate-600">
+                Your account exists but has not been switched on yet. Ask the shop owner or an admin
+                to approve it, then sign in again.
+            </p>
+            <button @click="signOut()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg py-2.5 text-sm cursor-pointer">Sign out</button>
+        </div>
+    </div>
+
+    <!-- ============ THE APP ============ -->
+    <div x-show="stage === 'ready'" class="flex flex-col md:flex-row jb-screen overflow-hidden bg-slate-100 text-slate-800 font-sans">
+
+        <!-- Sidebar Navigation (Updated Background and Logo) -->
+        <aside class="hidden md:flex w-64 bg-slate-900 text-white flex-col shadow-xl z-30">
+            <div class="p-5 border-b border-slate-850 text-center">
+                <!-- White cart mark, for the dark sidebar -->
+                <img src="../logo-mark-white.png" alt="JB Gadgets Store logo" class="h-20 w-auto mx-auto mb-3">
+
+                <!-- Store name and tagline, previously only inside the logo image -->
+                <p class="text-sm text-white font-bold tracking-wide">JB GADGETS STORE</p>
+                <p class="text-[10px] text-white/70 font-medium tracking-[0.14em] mt-1">AFFORDABILITY &amp; AUTHENTICITY</p>
+                <p class="text-[10px] text-white/60 mt-2" x-text="storeSettings.location + ' Store Manager'">Lusaka, Zambia Store Manager</p>
+            </div>
+            <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+                <button @click="currentTab = 'dashboard'" :class="currentTab === 'dashboard' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                    <span>Dashboard</span>
+                </button>
+                <button @click="currentTab = 'inventory'" :class="currentTab === 'inventory' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                    <span>Inventory</span>
+                </button>
+                <button @click="currentTab = 'pos'" :class="currentTab === 'pos' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"></path></svg>
+                    <span>Point of Sale</span>
+                </button>
+                <button @click="currentTab = 'returns'" :class="currentTab === 'returns' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 01-3 3H5a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+                    <span>Sales Returns</span>
+                </button>
+                <button @click="currentTab = 'repairs'" :class="currentTab === 'repairs' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <span>Repairs</span>
+                </button>
+                <button @click="currentTab = 'customers'" :class="currentTab === 'customers' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5 5 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    <span>Customers</span>
+                </button>
+                <button x-show="userRole === 'admin'" @click="currentTab = 'expenses'" :class="currentTab === 'expenses' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>Expenses</span>
+                </button>
+                <button x-show="userRole === 'admin'" @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
+                    <span>Settings</span>
+                </button>
+            </nav>
+            <div class="p-4 border-t border-slate-850 text-xs text-white text-center font-mono opacity-60">
+                v6.2 - Enterprise Edition
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col h-full overflow-y-auto z-10">
+            
+            <!-- Top Header Bar (Updated) -->
+            <header class="bg-white shadow-sm h-16 flex items-center justify-between px-4 md:px-8 border-b sticky top-0 z-20">
+                <div class="flex items-center space-x-2">
+                    <img src="../logo-mark.png" alt="JB Gadgets Store logo" class="h-8 w-auto md:hidden">
+                    <span class="text-slate-300 md:hidden">|</span>
+                    <h2 class="text-base md:text-xl font-semibold capitalize text-slate-800" x-text="currentTab === 'pos' ? 'Point of Sale' : (currentTab === 'returns' ? 'Sales Returns' : currentTab)"></h2>
+                </div>
+                
+                <!-- Who is signed in. The role comes from the database, not a
+                     dropdown: picking your own role is what we are preventing. -->
+                <div class="flex items-center space-x-2 md:space-x-3">
+                    <span x-show="!online" class="inline-flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                        <span>Offline<span x-show="queuedSales.length" x-text="' · ' + queuedSales.length + ' to sync'"></span></span>
+                    </span>
+                    <div class="text-right hidden sm:block">
+                        <p class="text-xs font-semibold text-slate-700 leading-tight" x-text="profile.full_name"></p>
+                        <p class="text-[10px] uppercase tracking-wide leading-tight"
+                           :class="profile.role === 'cashier' ? 'text-emerald-600' : 'text-blue-600'"
+                           x-text="profile.role"></p>
+                    </div>
+                    <button @click="signOut()" class="border rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">Sign out</button>
+                </div>
+            </header>
+
+            <!-- Dynamic Views Container -->
+            <div class="p-4 md:p-8 space-y-6 max-w-7xl mx-auto w-full mb-16 md:mb-0">
+
+                <!-- 1. DASHBOARD TAB -->
+                <div x-show="currentTab === 'dashboard'" class="space-y-6">
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                        <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200">
+                            <p class="text-xs md:text-sm text-slate-500 font-medium">Net Revenue</p>
+                            <h3 class="text-xl md:text-2xl font-bold text-emerald-600 mt-2" x-text="storeSettings.currency + ' ' + netRevenue.toFixed(2)">ZMW 0.00</h3>
+                        </div>
+
+                        <!-- Admin Financial Cards -->
+                        <div x-show="userRole === 'admin'" class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200">
+                            <p class="text-xs md:text-sm text-slate-500 font-medium">Net Estimated Profit</p>
+                            <h3 class="text-xl md:text-2xl font-bold text-blue-600 mt-2" x-text="storeSettings.currency + ' ' + netProfit.toFixed(2)">ZMW 0.00</h3>
+                        </div>
+                        <div x-show="userRole === 'admin'" class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200">
+                            <p class="text-xs md:text-sm text-slate-500 font-medium">Total Expenses</p>
+                            <h3 class="text-xl md:text-2xl font-bold text-rose-600 mt-2" x-text="storeSettings.currency + ' ' + totalExpenses.toFixed(2)">ZMW 0.00</h3>
+                        </div>
+
+                        <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200">
+                            <p class="text-xs md:text-sm text-slate-500 font-medium">Active Repairs</p>
+                            <h3 class="text-xl md:text-2xl font-bold text-amber-600 mt-2" x-text="repairs.filter(r => r.status !== 'Collected').length">0</h3>
+                        </div>
+                    </div>
+
+                    <!-- Recent Sales Panel -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                        <h3 class="text-base md:text-lg font-bold text-slate-800">Recent Sales History</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[600px]">
+                               <thead>
+                                    <tr class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                                        <th class="p-3">Sale ID & Date</th>
+                                        <th class="p-3">Customer & Type</th>
+                                        <th class="p-3">Items Sold</th>
+                                        <th class="p-3 text-right">Discount</th>
+                                        <th class="p-3 text-right">Final Amount</th>
+                                        <th class="p-3 text-center">Status</th>
+                                    </tr>
+                               </thead>
+                               <tbody class="divide-y text-sm">
+                                    <template x-for="sale in sales.slice().reverse()" :key="sale.id">
+                                        <tr class="hover:bg-slate-50">
+                                            <td class="p-3">
+                                                <p class="font-mono text-xs font-bold text-slate-700" x-text="'#' + sale.id"></p>
+                                                <p class="text-[11px] text-slate-400" x-text="sale.date"></p>
+                                            </td>
+                                            <td class="p-3">
+                                                <p class="font-medium text-slate-800 text-xs" x-text="sale.customerName || 'Walk-in Customer'"></p>
+                                                <span :class="sale.saleType === 'Swap' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'" class="inline-block text-[10px] px-1.5 py-0.5 rounded font-medium mt-0.5" x-text="sale.saleType || 'Cash'"></span>
+                                            </td>
+                                            <td class="p-3">
+                                                <template x-for="item in sale.items">
+                                                    <span class="inline-block bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded mr-1 mb-1 border border-slate-200" x-text="item.name + ' (' + item.condition + ') x' + item.qty"></span>
+                                                </template>
+                                                <template x-if="sale.tradeInDevice">
+                                                    <div class="text-[11px] text-amber-700 italic mt-0.5" x-text="'Trade-in: ' + sale.tradeInDevice + ' (-' + storeSettings.currency + ' ' + (sale.tradeInValue || 0).toFixed(2) + ')'"></div>
+                                                </template>
+                                            </td>
+                                            <td class="p-3 text-right text-slate-500 text-xs" x-text="sale.discount > 0 ? ('-' + storeSettings.currency + ' ' + sale.discount.toFixed(2)) : '-'"></td>
+                                            <td class="p-3 text-right text-emerald-600 font-bold" x-text="storeSettings.currency + ' ' + sale.total.toFixed(2)"></td>
+                                            <td class="p-3 text-center">
+                                                <span :class="sale.returned ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'" class="px-2 py-0.5 rounded text-[11px] font-medium" x-text="sale.returned ? 'Returned' : 'Completed'"></span>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <template x-if="sales.length === 0">
+                                        <tr>
+                                            <td colspan="6" class="p-6 text-center text-slate-400">No sales recorded yet.</td>
+                                        </tr>
+                                    </template>
+                               </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. INVENTORY TAB -->
+                <div x-show="currentTab === 'inventory'" class="space-y-6">
+                    <div x-show="userRole === 'admin'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Add Single Product -->
+                        <div class="lg:col-span-2 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h3 class="text-base md:text-lg font-bold text-slate-800 mb-4">Add Product</h3>
+                            <form @submit.prevent="addItem" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
+                                <input type="text" x-model="newItem.name" placeholder="Item Name" class="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 sm:col-span-2" required>
+                                <select x-model="newItem.category" class="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="Phones">Phones</option>
+                                    <option value="Accessories">Accessories</option>
+                                    <option value="Consoles">Gaming Consoles</option>
+                                </select>
+                                <select x-model="newItem.condition" class="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="Brand New">Brand New</option>
+                                    <option value="Pre-Owned">Pre-Owned</option>
+                                </select>
+                                <input type="number" x-model="newItem.costPrice" placeholder="Cost Price" class="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" required min="0" step="0.01">
+                                <input type="number" x-model="newItem.sellingPrice" placeholder="Selling Price" class="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" required min="0" step="0.01">
+                                <input type="number" x-model="newItem.stock" placeholder="Stock Qty" class="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 sm:col-span-2" required min="0">
+                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 text-sm transition sm:col-span-2 md:col-span-4 flex items-center justify-center space-x-2 cursor-pointer">
+                                    <span>Add Single Item</span>
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Bulk CSV Upload & Embedded Data Import -->
+                        <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
+                            <div>
+                                <h3 class="text-base md:text-lg font-bold text-slate-800 mb-1">Bulk CSV & Embedded Data</h3>
+                                <p class="text-xs text-slate-500 mb-3">Load items instantly using the embedded store CSV template or upload your own file.</p>
+                                
+                                <div class="space-y-2">
+                                    <button @click="loadEmbeddedCSV()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs py-2 px-3 rounded-lg transition flex items-center justify-center space-x-1 cursor-pointer">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                        <span>Load Embedded Inventory CSV</span>
+                                    </button>
+                                    <div class="flex space-x-2">
+                                        <button @click="downloadCSVTemplate()" class="flex-1 border border-blue-600 text-blue-600 hover:bg-blue-50 font-medium text-xs py-2 px-3 rounded-lg transition cursor-pointer">
+                                            Download Template
+                                        </button>
+                                        <button @click="copyCSVTemplate()" class="flex-1 border border-blue-600 text-blue-600 hover:bg-blue-50 font-medium text-xs py-2 px-3 rounded-lg transition cursor-pointer">
+                                            Copy Template
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="file" @change="handleCSVUpload" accept=".csv" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 cursor-pointer">
+                        </div>
+                    </div>
+
+                    <!-- Search Controls -->
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <div class="relative flex-1">
+                            <input type="text" x-model="searchQuery" placeholder="Search products..." class="w-full border rounded-xl px-4 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+                        </div>
+                        <select x-model="selectedCategory" class="border rounded-xl px-4 py-2.5 text-sm bg-white outline-none shadow-sm cursor-pointer">
+                            <option value="All">All Categories</option>
+                            <option value="Phones">Phones</option>
+                            <option value="Accessories">Accessories</option>
+                            <option value="Consoles">Gaming Consoles</option>
+                        </select>
+                        <select x-model="selectedCondition" class="border rounded-xl px-4 py-2.5 text-sm bg-white outline-none shadow-sm cursor-pointer">
+                            <option value="All">All Conditions</option>
+                            <option value="Brand New">Brand New</option>
+                            <option value="Pre-Owned">Pre-Owned</option>
+                        </select>
+                    </div>
+
+                    <!-- Inventory Table with Admin Price Adjustments -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[700px]">
+                            <thead>
+                                <tr class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                                    <th class="p-4">Product Name</th>
+                                    <th class="p-4">Category</th>
+                                    <th class="p-4">Condition</th>
+                                    <th x-show="userRole === 'admin'" class="p-4 text-blue-700">Cost Price</th>
+                                    <th class="p-4 text-emerald-700">Selling Price</th>
+                                    <th class="p-4">Stock</th>
+                                    <th x-show="userRole === 'admin'" class="p-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y text-sm">
+                                <template x-for="(item, index) in filteredInventory" :key="index">
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="p-4 font-medium text-slate-800" x-text="item.name"></td>
+                                        <td class="p-4"><span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md text-xs font-medium border border-slate-200" x-text="item.category"></span></td>
+                                        <td class="p-4">
+                                            <span :class="item.condition === 'Brand New' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200'" class="px-2 py-0.5 rounded text-xs font-medium border" x-text="item.condition"></span>
+                                        </td>
+                                        
+                                        <!-- Editable Cost Price (Admin Only) -->
+                                        <td x-show="userRole === 'admin'" class="p-4 text-blue-700 font-medium">
+                                            <div class="flex items-center space-x-1">
+                                                <span class="text-xs" x-text="storeSettings.currency"></span>
+                                                <input type="number" x-model.number="item.costPrice" @change="updateItem(item)" class="w-24 border rounded px-1.5 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white" min="0" step="0.01">
+                                            </div>
+                                        </td>
+                                        
+                                        <!-- Editable Selling Price (Admin Only) or Static View for Cashier -->
+                                        <td class="p-4 text-emerald-600 font-bold">
+                                            <template x-if="userRole === 'admin'">
+                                                <div class="flex items-center space-x-1">
+                                                    <span class="text-xs text-emerald-700" x-text="storeSettings.currency"></span>
+                                                    <input type="number" x-model.number="item.sellingPrice" @change="updateItem(item)" class="w-24 border border-emerald-300 rounded px-1.5 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500 bg-emerald-50 text-emerald-800 font-bold" min="0" step="0.01">
+                                                </div>
+                                            </template>
+                                            <template x-if="userRole !== 'admin'">
+                                                <span x-text="storeSettings.currency + ' ' + parseFloat(item.sellingPrice).toFixed(2)"></span>
+                                            </template>
+                                        </td>
+
+                                        <!-- Stock Qty Adjustments -->
+                                        <td class="p-4">
+                                            <template x-if="userRole === 'admin'">
+                                                <input type="number" x-model.number="item.stock" @change="updateItem(item)" class="w-16 border rounded px-1.5 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white" min="0">
+                                            </template>
+                                            <template x-if="userRole !== 'admin'">
+                                                <span :class="item.stock < 3 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'" class="px-2.5 py-1 rounded-md text-xs font-medium" x-text="item.stock"></span>
+                                            </template>
+                                        </td>
+
+                                        <td x-show="userRole === 'admin'" class="p-4 text-right">
+                                            <button @click="deleteItem(item)" class="text-rose-600 hover:text-rose-800 text-xs font-medium p-1 cursor-pointer">Delete</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 3. POS TAB (with Discount, Cash / Swap & Top-Up support) -->
+                <div x-show="currentTab === 'pos'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Item Selection Panel -->
+                    <div class="lg:col-span-2 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-base md:text-lg font-bold text-slate-800">Select Items to Sell</h3>
+                            <div class="flex space-x-2">
+                                <button @click="posSaleType = 'Cash'" :class="posSaleType === 'Cash' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer">Direct Cash</button>
+                                <button @click="posSaleType = 'Swap'" :class="posSaleType === 'Swap' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer">Swap & Top-Up</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[420px] overflow-y-auto pr-1">
+                            <template x-for="(item, index) in inventory" :key="index">
+                                <div class="border p-3.5 rounded-xl flex flex-col justify-between hover:border-blue-500 transition cursor-pointer bg-white" @click="addToCart(item)">
+                                    <div>
+                                        <div class="flex justify-between items-start">
+                                            <h4 class="font-semibold text-slate-800 text-sm" x-text="item.name"></h4>
+                                            <span :class="item.condition === 'Brand New' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200'" class="text-[10px] px-1.5 py-0.5 rounded font-medium border" x-text="item.condition"></span>
+                                        </div>
+                                        <p class="text-xs text-slate-500 mt-0.5" x-text="item.category"></p>
+                                    </div>
+                                    <div class="flex justify-between items-center mt-3">
+                                        <span class="text-emerald-600 font-bold text-sm" x-text="storeSettings.currency + ' ' + item.sellingPrice"></span>
+                                        <span class="text-xs text-slate-400" x-text="'Stock: ' + item.stock"></span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    
+                    <!-- Checkout Cart & Transaction Calculations -->
+                    <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center border-b pb-2">
+                                <h3 class="text-base md:text-lg font-bold text-slate-800">Current Cart</h3>
+                                <span :class="posSaleType === 'Swap' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'" class="text-xs font-semibold px-2 py-0.5 rounded" x-text="posSaleType + ' Transaction'"></span>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">Assign to Customer (Optional)</label>
+                                <select x-model="selectedCustomerName" class="w-full border rounded-lg px-3 py-2 text-sm outline-none bg-white cursor-pointer">
+                                    <option value="">Walk-in Customer</option>
+                                    <template x-for="cust in customers">
+                                        <option :value="cust.name" x-text="cust.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <!-- Cart Items List -->
+                            <div class="space-y-2 max-h-[140px] overflow-y-auto border-b pb-3">
+                                <template x-for="(cartItem, idx) in cart" :key="idx">
+                                    <div class="flex justify-between items-center text-sm border-b border-dashed pb-1.5">
+                                        <div>
+                                            <p class="font-medium text-slate-800 text-xs" x-text="cartItem.name + ' (' + cartItem.condition + ')'"></p>
+                                            <p class="text-[11px] text-slate-400" x-text="storeSettings.currency + ' ' + cartItem.sellingPrice + ' x ' + cartItem.qty"></p>
+                                        </div>
+                                        <button @click="removeFromCart(idx)" class="text-rose-500 text-xs px-1 py-0.5 cursor-pointer">Remove</button>
+                                    </div>
+                                </template>
+                                <template x-if="cart.length === 0">
+                                    <p class="text-xs text-slate-400 text-center py-2">Cart is empty</p>
+                                </template>
+                            </div>
+
+                            <!-- Swap / Trade-In Fields -->
+                            <div x-show="posSaleType === 'Swap'" class="bg-amber-50 p-3 rounded-lg border border-amber-200 space-y-2">
+                                <h4 class="text-xs font-bold text-amber-900 uppercase">Customer Trade-In Device</h4>
+                                <input type="text" x-model="tradeInDevice" placeholder="Device Name (e.g. iPhone 11 64GB)" class="w-full border rounded px-2.5 py-1.5 text-xs outline-none bg-white">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs text-amber-800 font-semibold">Value:</span>
+                                    <input type="number" x-model.number="tradeInValue" placeholder="Trade-in Allowance" class="w-full border rounded px-2.5 py-1.5 text-xs outline-none bg-white" min="0" step="0.01">
+                                </div>
+                            </div>
+
+                            <!-- Discount Input -->
+                            <div class="bg-slate-50 p-3 rounded-lg border space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <label class="text-xs font-semibold text-slate-700">Discount Amount</label>
+                                    <span class="text-[10px] text-slate-400">Subtracts from total</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs text-slate-500 font-bold" x-text="storeSettings.currency"></span>
+                                    <input type="number" x-model.number="discountAmount" placeholder="0.00" class="w-full border rounded px-2.5 py-1.5 text-xs outline-none bg-white focus:ring-1 focus:ring-blue-500" min="0" step="0.01">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Calculations Summary & Checkout -->
+                        <div class="border-t pt-3 space-y-2">
+                            <div class="flex justify-between text-xs text-slate-500">
+                                <span>Cart Subtotal:</span>
+                                <span class="font-medium" x-text="storeSettings.currency + ' ' + cartSubtotal.toFixed(2)"></span>
+                            </div>
+                            <div x-show="posSaleType === 'Swap' && tradeInValue > 0" class="flex justify-between text-xs text-amber-700">
+                                <span>Trade-in Credit:</span>
+                                <span class="font-medium" x-text="'-' + storeSettings.currency + ' ' + parseFloat(tradeInValue || 0).toFixed(2)"></span>
+                            </div>
+                            <div x-show="discountAmount > 0" class="flex justify-between text-xs text-rose-600">
+                                <span>Discount Applied:</span>
+                                <span class="font-medium" x-text="'-' + storeSettings.currency + ' ' + parseFloat(discountAmount || 0).toFixed(2)"></span>
+                            </div>
+                            <div class="flex justify-between text-base font-bold text-slate-800 border-t pt-2">
+                                <span>Final Payable:</span>
+                                <span class="text-emerald-600" x-text="storeSettings.currency + ' ' + cartFinalTotal.toFixed(2)"></span>
+                            </div>
+
+                            <button @click="checkout" :disabled="cart.length === 0" class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-medium py-2.5 rounded-lg transition text-sm flex items-center justify-center space-x-2 cursor-pointer mt-2">
+                                <span>Complete Transaction</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. SALES RETURNS TAB -->
+                <div x-show="currentTab === 'returns'" class="space-y-6">
+                    <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="text-base md:text-lg font-bold text-slate-800 mb-2">Process Sales Return & Restock</h3>
+                        <p class="text-xs text-slate-500 mb-4">Enter the Sale ID from receipt or search recent sales to return items back into inventory and record refund.</p>
+                        
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <input type="text" x-model="returnSearchId" placeholder="Enter Sale ID (e.g. 1001)" class="border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 flex-1">
+                            <button @click="searchSaleForReturn()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition cursor-pointer">
+                                Find Sale
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Selected Sale Return Details -->
+                    <template x-if="selectedSaleForReturn">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                            <div class="flex justify-between items-center border-b pb-3">
+                                <div>
+                                    <h4 class="font-bold text-slate-800" x-text="'Sale #' + selectedSaleForReturn.id"></h4>
+                                    <p class="text-xs text-slate-500" x-text="'Date: ' + selectedSaleForReturn.date + ' | Customer: ' + (selectedSaleForReturn.customerName || 'Walk-in')"></p>
+                                </div>
+                                <span :class="selectedSaleForReturn.returned ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'" class="px-2.5 py-1 rounded text-xs font-semibold" x-text="selectedSaleForReturn.returned ? 'Already Returned' : 'Active Sale'"></span>
+                            </div>
+
+                            <div class="space-y-2">
+                                <h5 class="text-xs font-bold text-slate-600 uppercase">Items in this sale:</h5>
+                                <div class="divide-y border rounded-lg p-2 bg-slate-50">
+                                    <template x-for="item in selectedSaleForReturn.items">
+                                        <div class="flex justify-between items-center py-2 text-sm">
+                                            <div>
+                                                <span class="font-medium text-slate-800" x-text="item.name + ' (' + item.condition + ')'"></span>
+                                                <span class="text-xs text-slate-500" x-text="' x ' + item.qty"></span>
+                                            </div>
+                                            <span class="font-bold text-slate-700" x-text="storeSettings.currency + ' ' + (item.sellingPrice * item.qty).toFixed(2)"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 mb-1">Reason for Return</label>
+                                    <input type="text" x-model="returnReason" placeholder="e.g. Customer changed mind / Defective device" class="w-full border rounded-lg px-3 py-2 text-sm outline-none">
+                                </div>
+                                <div class="flex items-end justify-end">
+                                    <button @click="processReturn(selectedSaleForReturn)" :disabled="selectedSaleForReturn.returned" class="bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition cursor-pointer">
+                                        Confirm Return & Restock Items
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Sales Returns History Log -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                        <h3 class="text-base md:text-lg font-bold text-slate-800">Processed Returns Log</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[600px]">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                                        <th class="p-3">Return Date</th>
+                                        <th class="p-3">Original Sale ID</th>
+                                        <th class="p-3">Reason</th>
+                                        <th class="p-3 text-right">Refunded Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y text-sm">
+                                    <template x-for="ret in returnsLog.slice().reverse()" :key="ret.id">
+                                        <tr class="hover:bg-slate-50">
+                                            <td class="p-3 text-xs text-slate-500" x-text="ret.returnDate"></td>
+                                            <td class="p-3 font-mono font-bold text-slate-700" x-text="'#' + ret.saleId"></td>
+                                            <td class="p-3 text-slate-600" x-text="ret.reason"></td>
+                                            <td class="p-3 text-right font-bold text-rose-600" x-text="'-' + storeSettings.currency + ' ' + ret.refundTotal.toFixed(2)"></td>
+                                        </tr>
+                                    </template>
+                                    <template x-if="returnsLog.length === 0">
+                                        <tr>
+                                            <td colspan="4" class="p-6 text-center text-slate-400">No returns recorded.</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. REPAIRS TAB -->
+                <div x-show="currentTab === 'repairs'" class="space-y-6">
+                    <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="text-base md:text-lg font-bold text-slate-800 mb-4">New Repair Ticket</h3>
+                        <form @submit.prevent="addRepair" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                            <input type="text" x-model="newRepair.customer" placeholder="Customer Name" class="border rounded-lg px-3 py-2 text-sm outline-none" required>
+                            <input type="text" x-model="newRepair.phone" placeholder="Phone Number" class="border rounded-lg px-3 py-2 text-sm outline-none" required>
+                            <input type="text" x-model="newRepair.device" placeholder="Device (e.g. iPad Pro)" class="border rounded-lg px-3 py-2 text-sm outline-none" required>
+                            <input type="text" x-model="newRepair.issue" placeholder="Issue Description" class="border rounded-lg px-3 py-2 text-sm outline-none" required>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 text-sm transition sm:col-span-2 md:col-span-1 cursor-pointer">Create Ticket</button>
+                        </form>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[650px]">
+                            <thead>
+                                <tr class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                                    <th class="p-4">Customer</th>
+                                    <th class="p-4">Device</th>
+                                    <th class="p-4">Issue</th>
+                                    <th class="p-4">Status</th>
+                                    <th class="p-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y text-sm">
+                                <template x-for="(repair, index) in repairs" :key="index">
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="p-4">
+                                            <p class="font-medium text-slate-800" x-text="repair.customer"></p>
+                                            <p class="text-xs text-slate-400" x-text="repair.phone"></p>
+                                        </td>
+                                        <td class="p-4" x-text="repair.device"></td>
+                                        <td class="p-4 text-slate-600" x-text="repair.issue"></td>
+                                        <td class="p-4">
+                                            <select x-model="repair.status" @change="updateRepair(repair)" class="border rounded-md px-2 py-1 text-xs font-medium cursor-pointer" :class="{
+                                                'bg-amber-50 text-amber-700': repair.status === 'Pending',
+                                                'bg-blue-50 text-blue-700': repair.status === 'In Progress',
+                                                'bg-emerald-50 text-emerald-700': repair.status === 'Ready',
+                                                'bg-slate-100 text-slate-700': repair.status === 'Collected'
+                                            }">
+                                                <option value="Pending">Pending</option>
+                                                <option value="In Progress">In Progress</option>
+                                                <option value="Ready">Ready</option>
+                                                <option value="Collected">Collected</option>
+                                            </select>
+                                        </td>
+                                        <td class="p-4 text-right space-x-1">
+                                            <a :href="waLink(repair)" target="_blank" rel="noopener" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-2.5 py-1.5 rounded transition inline-flex items-center space-x-1 cursor-pointer">
+                                                <span>WhatsApp</span>
+                                            </a>
+                                            <button @click="deleteRepair(repair)" class="text-rose-500 hover:text-rose-700 text-xs font-medium p-1 cursor-pointer">Delete</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 6. CUSTOMERS TAB -->
+                <div x-show="currentTab === 'customers'" class="space-y-6">
+                    <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="text-base md:text-lg font-bold text-slate-800 mb-4">Add Customer</h3>
+                        <form @submit.prevent="addCustomer" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <input type="text" x-model="newCustomer.name" placeholder="Full Name" class="border rounded-lg px-3 py-2 text-sm outline-none" required>
+                            <input type="text" x-model="newCustomer.phone" placeholder="Phone Number" class="border rounded-lg px-3 py-2 text-sm outline-none" required>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 text-sm transition cursor-pointer">Save Customer</button>
+                        </form>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[500px]">
+                            <thead>
+                                <tr class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                                    <th class="p-4">Customer Name</th>
+                                    <th class="p-4">Phone Number</th>
+                                    <th class="p-4">Total Spent</th>
+                                    <th class="p-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y text-sm">
+                                <template x-for="(cust, index) in customers" :key="index">
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="p-4 font-medium text-slate-800" x-text="cust.name"></td>
+                                        <td class="p-4 text-slate-600" x-text="cust.phone"></td>
+                                        <td class="p-4 text-emerald-600 font-semibold" x-text="storeSettings.currency + ' ' + getCustomerSpent(cust.name).toFixed(2)"></td>
+                                        <td class="p-4 text-right">
+                                            <button @click="deleteCustomer(cust)" class="text-rose-500 hover:text-rose-700 text-xs font-medium p-1 cursor-pointer">Delete</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 7. EXPENSES TAB -->
+                <div x-show="currentTab === 'expenses'" class="space-y-6">
+                    <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="text-base md:text-lg font-bold text-slate-800 mb-4">Record Store Expense</h3>
+                        <form @submit.prevent="addExpense" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <input type="text" x-model="newExpense.description" placeholder="Expense Reason (e.g. Spare parts)" class="border rounded-lg px-3 py-2 text-sm outline-none" required>
+                            <input type="number" x-model="newExpense.amount" placeholder="Amount" class="border rounded-lg px-3 py-2 text-sm outline-none" required min="0" step="0.01">
+                            <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-lg px-4 py-2 text-sm transition cursor-pointer">Record Expense</button>
+                        </form>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[500px]">
+                            <thead>
+                                <tr class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                                    <th class="p-4">Date</th>
+                                    <th class="p-4">Description</th>
+                                    <th class="p-4 text-right">Amount</th>
+                                    <th class="p-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y text-sm">
+                                <template x-for="(exp, index) in expenses" :key="index">
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="p-4 text-slate-500 text-xs" x-text="exp.date"></td>
+                                        <td class="p-4 font-medium text-slate-800" x-text="exp.description"></td>
+                                        <td class="p-4 text-right text-rose-600 font-semibold" x-text="'-' + storeSettings.currency + ' ' + parseFloat(exp.amount).toFixed(2)"></td>
+                                        <td class="p-4 text-right">
+                                            <button @click="deleteExpense(exp)" class="text-rose-500 hover:text-rose-700 text-xs font-medium p-1 cursor-pointer">Delete</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 8. SETTINGS TAB -->
+                <div x-show="currentTab === 'settings'" class="space-y-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl space-y-4">
+                        <h3 class="text-lg font-bold text-slate-800 border-b pb-3">Store Configuration & Preferences</h3>
+                        <form @submit.prevent="saveSettings" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Store Name</label>
+                                <input type="text" x-model="storeSettings.storeName" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Location / Address</label>
+                                <input type="text" x-model="storeSettings.location" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Currency Code / Symbol</label>
+                                <input type="text" x-model="storeSettings.currency" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Receipt Footer Note</label>
+                                <input type="text" x-model="storeSettings.receiptFooter" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+                            </div>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer">Save Settings</button>
+                        </form>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-rose-200 max-w-2xl space-y-3">
+                        <h3 class="text-lg font-bold text-slate-800 border-b pb-3">Clear Test Data</h3>
+                        <p class="text-sm text-slate-600">
+                            Deletes every sale and every sales return saved on this device, for when the records so far were
+                            only practice runs. Stock sold on those sales is added back, so your quantities are correct again.
+                            Products, customers, repairs and expenses are left untouched.
+                        </p>
+                        <p class="text-xs text-slate-500">
+                            This device currently holds
+                            <span class="font-bold" x-text="sales.length"></span> sale(s) and
+                            <span class="font-bold" x-text="returnsLog.length"></span> return(s).
+                        </p>
+                        <button @click="askClearSales()" :disabled="sales.length === 0 && returnsLog.length === 0"
+                            class="bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer">
+                            Clear Sales &amp; Returns
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Thermal Receipt Modal -->
+        <div x-show="showReceipt" class="fixed inset-0 bg-slate-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div id="printable-receipt" class="bg-white rounded-2xl p-6 max-w-xs w-full space-y-4 shadow-xl font-mono text-xs">
+                <div class="text-center border-b pb-3 border-dashed border-slate-300">
+                    <h3 class="text-base font-bold text-slate-900 tracking-wider" x-text="storeSettings.storeName">JB GADGETS STORE</h3>
+                    <p class="text-[10px] text-slate-500" x-text="storeSettings.location">Lusaka, Zambia</p>
+                    <p class="text-[10px] text-slate-700 font-bold mt-1" x-text="'RECEIPT #' + currentReceipt.id"></p>
+                    <p class="text-[10px] text-slate-400" x-text="currentReceipt.date"></p>
+                </div>
+                <div class="space-y-1.5 max-h-[180px] overflow-y-auto">
+                    <template x-for="item in currentReceipt.items">
+                        <div class="flex justify-between">
+                            <span x-text="item.name + ' (' + item.condition + ') x' + item.qty"></span>
+                            <span class="font-bold" x-text="storeSettings.currency + ' ' + (item.sellingPrice * item.qty).toFixed(2)"></span>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="border-t border-dashed border-slate-300 pt-2 space-y-1 text-[11px]">
+                    <div x-show="currentReceipt.tradeInDevice" class="flex justify-between text-amber-800">
+                        <span>Trade-In Allowance:</span>
+                        <span x-text="'-' + storeSettings.currency + ' ' + (currentReceipt.tradeInValue || 0).toFixed(2)"></span>
+                    </div>
+                    <div x-show="currentReceipt.discount > 0" class="flex justify-between text-rose-700">
+                        <span>Discount:</span>
+                        <span x-text="'-' + storeSettings.currency + ' ' + (currentReceipt.discount || 0).toFixed(2)"></span>
+                    </div>
+                    <div class="flex justify-between font-bold text-sm pt-1 border-t border-dashed">
+                        <span>TOTAL PAID:</span>
+                        <span x-text="storeSettings.currency + ' ' + (currentReceipt.total || 0).toFixed(2)"></span>
+                    </div>
+                </div>
+
+                <div class="flex flex-col space-y-2 pt-2 print:hidden">
+                    <div class="flex space-x-2">
+                        <button @click="window.print()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-xs cursor-pointer">Print</button>
+                        <button @click="downloadReceipt()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-xs cursor-pointer">Download</button>
+                        <button @click="copyReceipt()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-xs cursor-pointer">Copy</button>
+                    </div>
+                    <button @click="showReceipt = false" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-xs cursor-pointer">Done</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirm Return Modal -->
+        <div x-show="pendingReturn" class="fixed inset-0 bg-slate-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl">
+                <h3 class="text-base font-bold text-slate-900">Process this return?</h3>
+                <p class="text-sm text-slate-600">
+                    Sale #<span x-text="pendingReturn ? pendingReturn.id : ''"></span> will be marked as returned and
+                    every item on it goes back into stock. This cannot be undone.
+                </p>
+                <div class="flex space-x-2 pt-1">
+                    <button @click="pendingReturn = null" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-sm cursor-pointer">Cancel</button>
+                    <button @click="confirmReturn()" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded text-sm cursor-pointer">Yes, restock</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirm Clear Test Data Modal -->
+        <div x-show="pendingWipe" class="fixed inset-0 bg-slate-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl">
+                <h3 class="text-base font-bold text-slate-900">Erase all sales and returns?</h3>
+                <p class="text-sm text-slate-600">
+                    <span class="font-bold" x-text="pendingWipe ? pendingWipe.sales : 0"></span> sale(s) and
+                    <span class="font-bold" x-text="pendingWipe ? pendingWipe.returns : 0"></span> return(s) will be deleted
+                    from this device, and
+                    <span class="font-bold" x-text="pendingWipe ? pendingWipe.units : 0"></span> item(s) of stock will go
+                    back into inventory. This cannot be undone.
+                </p>
+                <div class="flex space-x-2 pt-1">
+                    <button @click="pendingWipe = null" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-sm cursor-pointer">Cancel</button>
+                    <button @click="confirmClearSales()" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded text-sm cursor-pointer">Yes, erase</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Bottom Navigation Bar (Updated) -->
+        <nav class="jb-bottomnav md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 text-white flex justify-around items-center border-t border-slate-850 z-50 px-1 overflow-x-auto">
+            <button @click="currentTab = 'dashboard'" :class="currentTab === 'dashboard' ? 'text-white' : 'text-white opacity-70'" class="flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition cursor-pointer">
+                <span>Dashboard</span>
+            </button>
+            <button @click="currentTab = 'inventory'" :class="currentTab === 'inventory' ? 'text-white' : 'text-white opacity-70'" class="flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition cursor-pointer">
+                <span>Stock</span>
+            </button>
+            <button @click="currentTab = 'pos'" :class="currentTab === 'pos' ? 'text-white' : 'text-white opacity-70'" class="flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition cursor-pointer">
+                <span>POS</span>
+            </button>
+            <button @click="currentTab = 'returns'" :class="currentTab === 'returns' ? 'text-white' : 'text-white opacity-70'" class="flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition cursor-pointer">
+                <span>Returns</span>
+            </button>
+            <button x-show="userRole === 'admin'" @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'text-white' : 'text-white opacity-70'" class="flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition cursor-pointer">
+                <span>Settings</span>
+            </button>
+        </nav>
+    </div><!-- /the app -->
+    </div><!-- /x-data root -->
+
+    <!-- JavaScript App Logic -->
+    <script>
+        // ================= CONNECTION =================
+        // These two values are safe in public code. They grant nothing on
+        // their own: the database decides what each signed-in person may
+        // see, and a stranger holding them gets nothing at all.
+        const SUPABASE_URL = 'https://ririkbajiojpcrllgivn.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpcmlrYmFqaW9qcGNybGxnaXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwNjM4ODEsImV4cCI6MjEwOTYzOTg4MX0.J1Ms4gMI7GQJSkBy9srIXxxmA-6SjsTiygQJd0AOIeE';
+
+        // On a bad line the library may not arrive at all. Without this guard
+        // the whole page would fail to start and show nothing but white.
+        const sb = (window.supabase && window.supabase.createClient)
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+            : null;
+
+        // ================= LOCAL CACHE =================
+        // Browser storage is no longer where the books live. It holds a copy
+        // of what was last loaded, so the shop can still see its stock when
+        // the internet drops, plus any sale waiting to be sent.
+        function jbGet(key) {
+            try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; }
+            catch (e) { return null; }
+        }
+        function jbSet(key, value) {
+            try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* storage unavailable */ }
+        }
+
+        // ================= MESSAGE BAR =================
+        let jbToastTimer;
+        function jbToast(msg) {
+            clearTimeout(jbToastTimer);
+            let el = document.getElementById('jb-toast');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'jb-toast';
+                el.setAttribute('role', 'status');
+                document.body.appendChild(el);
+            }
+            el.textContent = msg;
+            el.classList.add('show');
+            jbToastTimer = setTimeout(() => el.classList.remove('show'), 4000);
+        }
+
+        // ================= SHAPES =================
+        // The database uses under_scores, the screens use camelCase.
+        const toItem = r => ({
+            id: r.id, name: r.name, category: r.category, condition: r.condition,
+            costPrice: Number(r.cost_price ?? 0), sellingPrice: Number(r.selling_price),
+            stock: Number(r.stock)
+        });
+        const toSaleLine = r => ({
+            name: r.name, category: r.category, condition: r.condition,
+            costPrice: Number(r.cost_price ?? 0), sellingPrice: Number(r.selling_price),
+            qty: Number(r.qty)
+        });
+        const toSale = r => ({
+            id: r.id,
+            date: new Date(r.sold_at).toLocaleString(),
+            customerName: r.customer_name || '',
+            saleType: r.sale_type,
+            subtotal: Number(r.subtotal),
+            discount: Number(r.discount),
+            tradeInDevice: r.trade_in_device || '',
+            tradeInValue: Number(r.trade_in_value),
+            total: Number(r.total),
+            returned: r.returned,
+            items: []
+        });
+        const toReturn = r => ({
+            id: r.id, saleId: r.sale_id,
+            returnDate: new Date(r.return_date).toLocaleString(),
+            reason: r.reason, refundTotal: Number(r.refund_total)
+        });
+        const toExpense = r => ({
+            id: r.id, date: r.spent_on, description: r.description, amount: Number(r.amount)
+        });
+
+        const uuid = () => (crypto.randomUUID ? crypto.randomUUID()
+            : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            }));
+
+        // EMBEDDED DEFAULT INVENTORY CSV DATA
+        const EMBEDDED_CSV_DATA = `name,category,condition,costPrice,sellingPrice,stock
+iPhone 15 Pro Max 256GB,Phones,Brand New,21000,25000,4
+iPhone 13 128GB,Phones,Pre-Owned,9000,11500,3
+Samsung S24 Ultra,Phones,Brand New,22000,26500,2
+Huawei P50 Pro,Phones,Pre-Owned,7500,9800,2
+PlayStation 5 Slim,Consoles,Brand New,10500,13000,4
+Nintendo Switch OLED,Consoles,Pre-Owned,5000,6800,3
+AirPods Pro 2,Accessories,Brand New,3500,4500,8
+MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
+
+        function storeApp() {
+            return {
+                // ---- session ----
+                stage: 'loading',            // loading | signin | pending | ready
+                profile: { full_name: '', role: 'cashier', is_active: false },
+                loginEmail: '', loginPassword: '', loginError: '', loginNote: '', busy: false,
+                newPassword: '', newPassword2: '',
+                online: navigator.onLine,
+                queuedSales: jbGet('jb_queued_sales') || [],
+
+                // Keeps every x-show="userRole === 'admin'" in the page working.
+                // The owner gets everything an admin gets.
+                get userRole() {
+                    return (this.profile.role === 'owner' || this.profile.role === 'admin')
+                        ? 'admin' : 'cashier';
+                },
+
+                // ---- screen state ----
+                currentTab: 'dashboard',
+                searchQuery: '',
+                selectedCategory: 'All',
+                selectedCondition: 'All',
+                showReceipt: false,
+                currentReceipt: { id: '', date: '', customerName: '', items: [], total: 0, discount: 0, tradeInDevice: '', tradeInValue: 0 },
+                selectedCustomerName: '',
+                posSaleType: 'Cash',
+                discountAmount: 0,
+                tradeInDevice: '',
+                tradeInValue: 0,
+                returnSearchId: '',
+                selectedSaleForReturn: null,
+                returnReason: '',
+                pendingReturn: null,
+                pendingWipe: null,
+
+                // ---- the books ----
+                storeSettings: jbGet('jb_cache_settings') || {
+                    storeName: 'JB GADGETS STORE', location: 'Lusaka, Zambia',
+                    currency: 'ZMW', receiptFooter: 'Thank you for your business!'
+                },
+                inventory: jbGet('jb_cache_inventory') || [],
+                sales: jbGet('jb_cache_sales') || [],
+                returnsLog: jbGet('jb_cache_returns') || [],
+                repairs: jbGet('jb_cache_repairs') || [],
+                customers: jbGet('jb_cache_customers') || [],
+                expenses: jbGet('jb_cache_expenses') || [],
+
+                newItem: { name: '', category: 'Phones', condition: 'Brand New', costPrice: '', sellingPrice: '', stock: '' },
+                newRepair: { customer: '', phone: '', device: '', issue: '', status: 'Pending' },
+                newCustomer: { name: '', phone: '' },
+                newExpense: { description: '', amount: '' },
+                cart: [],
+
+                // ================= STARTUP =================
+                async init() {
+                    if (!sb) {
+                        this.stage = 'signin';
+                        this.loginError = 'Could not load the sign-in system. Check your internet connection and reload the page.';
+                        return;
+                    }
+                    window.addEventListener('online', () => { this.online = true; this.flushQueue(); });
+                    window.addEventListener('offline', () => { this.online = false; });
+
+                    // Arriving from a recovery email: Supabase signs the person
+                    // in briefly so they can set a new password. Catch that
+                    // before the normal startup sends them into the app.
+                    let recovering = false;
+                    sb.auth.onAuthStateChange((event, session) => {
+                        if (event === 'PASSWORD_RECOVERY') { recovering = true; this.stage = 'reset'; return; }
+                        if (!session && this.stage !== 'reset') { this.stage = 'signin'; }
+                    });
+
+                    if (window.location.hash.includes('type=recovery')) {
+                        this.stage = 'reset';
+                        return;
+                    }
+
+                    const { data } = await sb.auth.getSession();
+                    if (recovering || this.stage === 'reset') return;
+                    await this.afterSession(data.session);
+                },
+
+                async afterSession(session) {
+                    if (!session) { this.stage = 'signin'; return; }
+
+                    const { data: me, error } = await sb
+                        .from('profiles')
+                        .select('full_name, role, is_active')
+                        .eq('id', session.user.id)
+                        .maybeSingle();
+
+                    if (error) { this.stage = 'signin'; this.loginError = error.message; return; }
+                    if (!me) { this.stage = 'pending'; return; }
+
+                    this.profile = me;
+                    if (!me.is_active) { this.stage = 'pending'; return; }
+
+                    this.stage = 'ready';
+                    await this.loadAll();
+                    this.flushQueue();
+                },
+
+                async signIn() {
+                    if (!sb) { this.loginError = 'Still no connection. Reload the page once you are back online.'; return; }
+                    this.loginError = '';
+                    this.busy = true;
+                    const { data, error } = await sb.auth.signInWithPassword({
+                        email: this.loginEmail.trim(), password: this.loginPassword
+                    });
+                    this.busy = false;
+                    if (error) {
+                        this.loginError = error.message === 'Invalid login credentials'
+                            ? 'That email and password do not match an account.'
+                            : error.message;
+                        return;
+                    }
+                    this.loginPassword = '';
+                    await this.afterSession(data.session);
+                },
+
+                async sendReset() {
+                    if (!sb) { this.loginError = 'No connection. Try again once you are back online.'; return; }
+                    const email = this.loginEmail.trim();
+                    if (!email) { this.loginError = 'Type your email address above first, then tap this again.'; return; }
+                    this.loginError = ''; this.loginNote = ''; this.busy = true;
+                    const { error } = await sb.auth.resetPasswordForEmail(email, {
+                        redirectTo: window.location.origin + window.location.pathname
+                    });
+                    this.busy = false;
+                    if (error) { this.loginError = error.message; return; }
+                    // Said the same way whether or not the address exists, so this
+                    // cannot be used to find out who has an account.
+                    this.loginNote = 'If that email has an account, a reset link is on its way. Check your inbox and spam folder.';
+                },
+
+                async setNewPassword() {
+                    if (this.newPassword !== this.newPassword2) {
+                        this.loginError = 'Those two passwords are not the same.'; return;
+                    }
+                    if (this.newPassword.length < 8) {
+                        this.loginError = 'Use at least 8 characters.'; return;
+                    }
+                    this.loginError = ''; this.busy = true;
+                    const { error } = await sb.auth.updateUser({ password: this.newPassword });
+                    this.busy = false;
+                    if (error) {
+                        this.loginError = error.message.includes('expired')
+                            ? 'That reset link has expired. Ask for a new one from the sign-in screen.'
+                            : error.message;
+                        return;
+                    }
+                    this.newPassword = ''; this.newPassword2 = '';
+                    history.replaceState(null, '', window.location.pathname);
+                    const { data } = await sb.auth.getSession();
+                    await this.afterSession(data.session);
+                    jbToast('Password changed. You are signed in.');
+                },
+
+                async signOut() {
+                    await sb.auth.signOut();
+                    this.profile = { full_name: '', role: 'cashier', is_active: false };
+                    this.stage = 'signin';
+                },
+
+                // ================= LOADING =================
+                async loadAll() {
+                    // A cashier reads the catalogue through a list that carries
+                    // no cost price, so those figures never reach their browser.
+                    const catalogue = this.userRole === 'admin' ? 'inventory' : 'inventory_for_sale';
+                    const lineSource = this.userRole === 'admin' ? 'sale_items' : 'sale_items_for_receipt';
+
+                    const [inv, sales, lines, rets, reps, custs, exps, setts] = await Promise.all([
+                        sb.from(catalogue).select('*').order('name'),
+                        sb.from('sales').select('*').order('sold_at', { ascending: false }).limit(2000),
+                        sb.from(lineSource).select('*').limit(10000),
+                        sb.from('returns_log').select('*').order('return_date', { ascending: false }).limit(2000),
+                        sb.from('repairs').select('*').order('created_at', { ascending: false }),
+                        sb.from('customers').select('*').order('name'),
+                        this.userRole === 'admin'
+                            ? sb.from('expenses').select('*').order('spent_on', { ascending: false })
+                            : Promise.resolve({ data: [], error: null }),
+                        sb.from('settings').select('*').maybeSingle()
+                    ]);
+
+                    const firstError = [inv, sales, lines, rets, reps, custs, exps, setts]
+                        .map(r => r && r.error).filter(Boolean)[0];
+                    if (firstError) {
+                        jbToast('Could not load everything: ' + firstError.message + '. Showing the last copy held on this device.');
+                        return;
+                    }
+
+                    this.inventory = (inv.data || []).map(toItem);
+                    const byId = {};
+                    this.sales = (sales.data || []).map(r => { const s = toSale(r); byId[s.id] = s; return s; });
+                    (lines.data || []).forEach(l => { if (byId[l.sale_id]) byId[l.sale_id].items.push(toSaleLine(l)); });
+                    this.returnsLog = (rets.data || []).map(toReturn);
+                    this.repairs = (reps.data || []);
+                    this.customers = (custs.data || []);
+                    this.expenses = (exps.data || []).map(toExpense);
+                    if (setts.data) {
+                        this.storeSettings = {
+                            storeName: setts.data.store_name, location: setts.data.location,
+                            currency: setts.data.currency, receiptFooter: setts.data.receipt_footer
+                        };
+                    }
+                    this.cacheAll();
+                },
+
+                cacheAll() {
+                    jbSet('jb_cache_inventory', this.inventory);
+                    jbSet('jb_cache_sales', this.sales);
+                    jbSet('jb_cache_returns', this.returnsLog);
+                    jbSet('jb_cache_repairs', this.repairs);
+                    jbSet('jb_cache_customers', this.customers);
+                    jbSet('jb_cache_expenses', this.expenses);
+                    jbSet('jb_cache_settings', this.storeSettings);
+                },
+
+                // Shared handling for a failed write.
+                oops(error, what) {
+                    jbToast('Could not ' + what + ': ' + (error.message || 'no connection'));
+                },
+
+                // ================= SETTINGS =================
+                async saveSettings() {
+                    const { error } = await sb.from('settings').update({
+                        store_name: this.storeSettings.storeName,
+                        location: this.storeSettings.location,
+                        currency: this.storeSettings.currency,
+                        receipt_footer: this.storeSettings.receiptFooter,
+                        updated_at: new Date().toISOString()
+                    }).eq('id', true);
+                    if (error) return this.oops(error, 'save the settings');
+                    this.cacheAll();
+                    jbToast('Settings saved for everyone.');
+                },
+
+                // ================= FIGURES =================
+                get filteredInventory() {
+                    return this.inventory.filter(item => {
+                        let matchesSearch = item.name.toLowerCase().includes(this.searchQuery.toLowerCase());
+                        let matchesCategory = this.selectedCategory === 'All' || item.category === this.selectedCategory;
+                        let matchesCondition = this.selectedCondition === 'All' || item.condition === this.selectedCondition;
+                        return matchesSearch && matchesCategory && matchesCondition;
+                    });
+                },
+
+                get netRevenue() {
+                    let totalSales = this.sales.filter(s => !s.returned).reduce((sum, sale) => sum + sale.total, 0);
+                    let totalRefunds = this.returnsLog.reduce((sum, r) => sum + r.refundTotal, 0);
+                    return totalSales - totalRefunds;
+                },
+
+                get totalExpenses() {
+                    return this.expenses.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+                },
+
+                get netProfit() {
+                    let validSales = this.sales.filter(s => !s.returned);
+                    let totalCost = validSales.reduce((sum, sale) => {
+                        let saleCost = sale.items.reduce((cSum, item) => cSum + ((item.costPrice || 0) * item.qty), 0);
+                        return sum + saleCost;
+                    }, 0);
+                    return this.netRevenue - totalCost - this.totalExpenses;
+                },
+
+                // ================= STOCK =================
+                async addItem() {
+                    const { data, error } = await sb.from('inventory').insert({
+                        name: this.newItem.name,
+                        category: this.newItem.category,
+                        condition: this.newItem.condition,
+                        cost_price: parseFloat(this.newItem.costPrice || 0),
+                        selling_price: parseFloat(this.newItem.sellingPrice || 0),
+                        stock: parseInt(this.newItem.stock || 0, 10)
+                    }).select().single();
+                    if (error) return this.oops(error, 'add that product');
+                    this.inventory.push(toItem(data));
+                    this.newItem = { name: '', category: 'Phones', condition: 'Brand New', costPrice: '', sellingPrice: '', stock: '' };
+                    this.cacheAll();
+                    jbToast('Product added.');
+                },
+
+                // Admins may correct a price or a stock count in place.
+                // Cashiers only ever see these as read-only text.
+                async updateItem(item) {
+                    const { error } = await sb.from('inventory').update({
+                        cost_price: parseFloat(item.costPrice || 0),
+                        selling_price: parseFloat(item.sellingPrice || 0),
+                        stock: parseInt(item.stock || 0, 10),
+                        updated_at: new Date().toISOString()
+                    }).eq('id', item.id);
+                    if (error) return this.oops(error, 'save that change');
+                    this.cacheAll();
+                },
+
+                async deleteItem(item) {
+                    const { error } = await sb.from('inventory').delete().eq('id', item.id);
+                    if (error) return this.oops(error, 'remove that product');
+                    const idx = this.inventory.indexOf(item);
+                    if (idx > -1) this.inventory.splice(idx, 1);
+                    this.cacheAll();
+                },
+
+                async importRows(rows, label) {
+                    if (!rows.length) { jbToast('Nothing to import.'); return; }
+                    const { data, error } = await sb.from('inventory').insert(rows).select();
+                    if (error) return this.oops(error, 'import the stock list');
+                    (data || []).forEach(r => this.inventory.push(toItem(r)));
+                    this.cacheAll();
+                    jbToast(`Imported ${data ? data.length : 0} items ${label}.`);
+                },
+
+                parseCSV(text) {
+                    const out = [];
+                    text.split('\n').forEach((line, i) => {
+                        line = line.trim();
+                        if (!line) return;
+                        const cols = line.split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+                        if (i === 0 && (cols[0].toLowerCase() === 'name' || cols[0].toLowerCase() === 'item')) return;
+                        if (cols.length < 6) return;
+                        const cost = parseFloat(cols[3]), sell = parseFloat(cols[4]), stock = parseInt(cols[5], 10);
+                        if (!cols[0] || isNaN(cost) || isNaN(sell) || isNaN(stock)) return;
+                        out.push({
+                            name: cols[0],
+                            category: ['Phones', 'Accessories', 'Consoles'].includes(cols[1]) ? cols[1] : 'Accessories',
+                            condition: ['Brand New', 'Pre-Owned'].includes(cols[2]) ? cols[2] : 'Brand New',
+                            cost_price: cost, selling_price: sell, stock: stock
+                        });
+                    });
+                    return out;
+                },
+
+                loadEmbeddedCSV() { return this.importRows(this.parseCSV(EMBEDDED_CSV_DATA), 'from the built-in list'); },
+
+                handleCSVUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        await this.importRows(this.parseCSV(e.target.result), 'from your file');
+                        event.target.value = '';
+                    };
+                    reader.readAsText(file);
+                },
+
+                csvTemplateText() {
+                    let t = "name,category,condition,costPrice,sellingPrice,stock\n";
+                    t += "iPhone 14 Pro 128GB,Phones,Pre-Owned,11000,14000,3\n";
+                    t += "Samsung S24 Ultra,Phones,Brand New,21000,25000,2\n";
+                    t += "PS5 Controller,Accessories,Brand New,1200,1600,10\n";
+                    return t;
+                },
+
+                downloadCSVTemplate() {
+                    const blob = new Blob([this.csvTemplateText()], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = 'JB_Inventory_Import_Template.csv';
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                },
+
+                copyCSVTemplate() {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(this.csvTemplateText())
+                            .then(() => jbToast('Template copied. Paste it into Excel, save as .csv, then upload it above.'))
+                            .catch(() => jbToast('Copying was blocked here. Type the column names shown in the import notes instead.'));
+                    } else {
+                        jbToast('Copying is not available here. Type the column names shown in the import notes instead.');
+                    }
+                },
+
+                // ================= SELLING =================
+                addToCart(item) {
+                    if (item.stock <= 0) return jbToast('Out of stock!');
+                    const already = this.cart.filter(c => c.id === item.id).reduce((n, c) => n + c.qty, 0);
+                    if (already >= item.stock) return jbToast('That is all the stock on hand.');
+                    const existing = this.cart.find(c => c.id === item.id);
+                    if (existing) { existing.qty++; } else { this.cart.push({ ...item, qty: 1 }); }
+                },
+
+                removeFromCart(index) { this.cart.splice(index, 1); },
+
+                get cartSubtotal() {
+                    return this.cart.reduce((sum, item) => sum + (item.sellingPrice * item.qty), 0);
+                },
+
+                get cartFinalTotal() {
+                    let total = this.cartSubtotal;
+                    if (this.posSaleType === 'Swap') total -= parseFloat(this.tradeInValue || 0);
+                    total -= parseFloat(this.discountAmount || 0);
+                    return Math.max(0, total);
+                },
+
+                async checkout() {
+                    if (!this.cart.length) return;
+
+                    const args = {
+                        p_items: this.cart.map(c => ({ inventory_id: c.id, qty: c.qty })),
+                        p_customer_name: this.selectedCustomerName || null,
+                        p_sale_type: this.posSaleType,
+                        p_discount: parseFloat(this.discountAmount || 0),
+                        p_trade_in_device: this.posSaleType === 'Swap' ? this.tradeInDevice : null,
+                        p_trade_in_value: this.posSaleType === 'Swap' ? parseFloat(this.tradeInValue || 0) : 0,
+                        p_client_ref: uuid()
+                    };
+
+                    const receipt = {
+                        id: 'pending',
+                        date: new Date().toLocaleString(),
+                        customerName: this.selectedCustomerName,
+                        saleType: this.posSaleType,
+                        items: this.cart.map(c => ({ ...c })),
+                        subtotal: this.cartSubtotal,
+                        discount: parseFloat(this.discountAmount || 0),
+                        tradeInDevice: args.p_trade_in_device || '',
+                        tradeInValue: args.p_trade_in_value,
+                        total: this.cartFinalTotal,
+                        returned: false
+                    };
+
+                    const finishLocally = () => {
+                        // take the stock off the on-screen figures either way
+                        this.cart.forEach(c => {
+                            const inv = this.inventory.find(i => i.id === c.id);
+                            if (inv) inv.stock -= c.qty;
+                        });
+                        this.currentReceipt = receipt;
+                        this.cart = [];
+                        this.selectedCustomerName = '';
+                        this.discountAmount = 0;
+                        this.tradeInDevice = '';
+                        this.tradeInValue = 0;
+                        this.showReceipt = true;
+                        this.cacheAll();
+                    };
+
+                    if (!this.online) {
+                        this.queueSale(args, receipt);
+                        receipt.id = 'offline';
+                        finishLocally();
+                        jbToast('No connection. Sale saved on this device and will be sent when you are back online.');
+                        return;
+                    }
+
+                    const { data, error } = await sb.rpc('record_sale', args);
+                    if (error) {
+                        // A refusal from the database (no stock, for instance) is
+                        // not a connection problem and must not be queued.
+                        if (error.message && /Only .* left of|no longer in the catalogue|Not allowed/.test(error.message)) {
+                            return this.oops(error, 'complete the sale');
+                        }
+                        this.queueSale(args, receipt);
+                        receipt.id = 'offline';
+                        finishLocally();
+                        jbToast('Could not reach the shop database. Sale saved here and will be sent shortly.');
+                        return;
+                    }
+
+                    receipt.id = data;
+                    finishLocally();
+                    this.loadAll();
+                },
+
+                queueSale(args, receipt) {
+                    this.queuedSales.push({ args, receipt, at: new Date().toISOString() });
+                    jbSet('jb_queued_sales', this.queuedSales);
+                },
+
+                // Sends anything held on the device. Each queued sale carries its
+                // own reference, so a sale that did reach the database on an
+                // earlier try is recognised and not banked a second time.
+                async flushQueue() {
+                    if (!this.queuedSales.length || !this.online || this.stage !== 'ready') return;
+                    const stuck = [];
+                    let sent = 0;
+                    for (const q of this.queuedSales) {
+                        const { error } = await sb.rpc('record_sale', q.args);
+                        if (error) { q.lastError = error.message; stuck.push(q); } else { sent++; }
+                    }
+                    this.queuedSales = stuck;
+                    jbSet('jb_queued_sales', this.queuedSales);
+                    if (sent) jbToast(`${sent} sale(s) made offline have now been sent.`);
+                    if (stuck.length) jbToast(`${stuck.length} offline sale(s) were refused: ${stuck[0].lastError}`);
+                    if (sent) await this.loadAll();
+                },
+
+                // ================= RETURNS =================
+                searchSaleForReturn() {
+                    const found = this.sales.find(s => String(s.id) === String(this.returnSearchId).trim());
+                    if (found) { this.selectedSaleForReturn = found; }
+                    else { jbToast('Sale ID not found!'); this.selectedSaleForReturn = null; }
+                },
+
+                processReturn(sale) {
+                    if (sale.returned) return jbToast('This sale has already been returned.');
+                    this.pendingReturn = sale;
+                },
+
+                async confirmReturn() {
+                    const sale = this.pendingReturn;
+                    if (!sale) return;
+                    this.pendingReturn = null;
+                    const { error } = await sb.rpc('process_return', {
+                        p_sale_id: sale.id,
+                        p_reason: this.returnReason || 'Customer Return'
+                    });
+                    if (error) return this.oops(error, 'process that return');
+                    this.returnReason = '';
+                    this.selectedSaleForReturn = null;
+                    this.returnSearchId = '';
+                    await this.loadAll();
+                    jbToast('Return processed and the items are back in stock.');
+                },
+
+                askClearSales() {
+                    const units = this.sales.filter(s => !s.returned)
+                        .reduce((n, s) => n + (s.items || []).reduce((m, i) => m + i.qty, 0), 0);
+                    this.pendingWipe = { sales: this.sales.length, returns: this.returnsLog.length, units };
+                },
+
+                async confirmClearSales() {
+                    this.pendingWipe = null;
+                    const { data, error } = await sb.rpc('clear_sales_history');
+                    if (error) return this.oops(error, 'clear the sales history');
+                    await this.loadAll();
+                    jbToast(`Cleared ${data.sales} sale(s) and ${data.returns} return(s). ${data.units_restored} item(s) went back into stock.`);
+                },
+
+                // ================= REPAIRS =================
+                async addRepair() {
+                    const { data, error } = await sb.from('repairs')
+                        .insert({ ...this.newRepair, status: 'Pending' }).select().single();
+                    if (error) return this.oops(error, 'create that repair ticket');
+                    this.repairs.unshift(data);
+                    this.newRepair = { customer: '', phone: '', device: '', issue: '', status: 'Pending' };
+                    this.cacheAll();
+                },
+
+                async updateRepair(repair) {
+                    const { error } = await sb.from('repairs')
+                        .update({ status: repair.status, updated_at: new Date().toISOString() })
+                        .eq('id', repair.id);
+                    if (error) return this.oops(error, 'update that repair');
+                    this.cacheAll();
+                    jbToast('Repair updated to ' + repair.status + '.');
+                },
+
+                async deleteRepair(repair) {
+                    const { error } = await sb.from('repairs').delete().eq('id', repair.id);
+                    if (error) return this.oops(error, 'delete that repair');
+                    const idx = this.repairs.indexOf(repair);
+                    if (idx > -1) this.repairs.splice(idx, 1);
+                    this.cacheAll();
+                },
+
+                // ================= CUSTOMERS =================
+                async addCustomer() {
+                    const { data, error } = await sb.from('customers')
+                        .insert({ ...this.newCustomer }).select().single();
+                    if (error) return this.oops(error, 'save that customer');
+                    this.customers.push(data);
+                    this.newCustomer = { name: '', phone: '' };
+                    this.cacheAll();
+                },
+
+                async deleteCustomer(customer) {
+                    const { error } = await sb.from('customers').delete().eq('id', customer.id);
+                    if (error) return this.oops(error, 'delete that customer');
+                    const idx = this.customers.indexOf(customer);
+                    if (idx > -1) this.customers.splice(idx, 1);
+                    this.cacheAll();
+                },
+
+                getCustomerSpent(custName) {
+                    return this.sales
+                        .filter(s => s.customerName === custName && !s.returned)
+                        .reduce((sum, s) => sum + s.total, 0);
+                },
+
+                // ================= EXPENSES =================
+                async addExpense() {
+                    const { data, error } = await sb.from('expenses').insert({
+                        description: this.newExpense.description,
+                        amount: parseFloat(this.newExpense.amount || 0)
+                    }).select().single();
+                    if (error) return this.oops(error, 'record that expense');
+                    this.expenses.unshift(toExpense(data));
+                    this.newExpense = { description: '', amount: '' };
+                    this.cacheAll();
+                },
+
+                async deleteExpense(expense) {
+                    const { error } = await sb.from('expenses').delete().eq('id', expense.id);
+                    if (error) return this.oops(error, 'delete that expense');
+                    const idx = this.expenses.indexOf(expense);
+                    if (idx > -1) this.expenses.splice(idx, 1);
+                    this.cacheAll();
+                },
+
+                // ================= RECEIPT =================
+                waLink(repair) {
+                    const msg = `Hello ${repair.customer}, update regarding your ${repair.device} at ${this.storeSettings.storeName}. Status: *${repair.status}*. Thank you!`;
+                    return `https://wa.me/${String(repair.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`;
+                },
+
+                receiptText() {
+                    const r = this.currentReceipt;
+                    let text = `================================\n`;
+                    text += `          ${this.storeSettings.storeName.toUpperCase()}            \n`;
+                    text += `        ${this.storeSettings.location}          \n`;
+                    text += `================================\n`;
+                    text += `Receipt ID: #${r.id}\n`;
+                    text += `Date: ${r.date}\n`;
+                    if (r.customerName) text += `Customer: ${r.customerName}\n`;
+                    text += `Transaction Type: ${r.saleType || 'Cash'}\n`;
+                    text += `--------------------------------\n`;
+                    r.items.forEach(item => {
+                        text += `${item.name} (${item.condition}) (x${item.qty}) - ${this.storeSettings.currency} ${(item.sellingPrice * item.qty).toFixed(2)}\n`;
+                    });
+                    text += `--------------------------------\n`;
+                    if (r.tradeInDevice) text += `Trade-In: ${r.tradeInDevice} (-${this.storeSettings.currency} ${Number(r.tradeInValue).toFixed(2)})\n`;
+                    if (r.discount > 0) text += `Discount: -${this.storeSettings.currency} ${Number(r.discount).toFixed(2)}\n`;
+                    text += `FINAL PAID: ${this.storeSettings.currency} ${Number(r.total).toFixed(2)}\n`;
+                    text += `================================\n`;
+                    text += `  ${this.storeSettings.receiptFooter}  \n`;
+                    return text;
+                },
+
+                downloadReceipt() {
+                    const blob = new Blob([this.receiptText()], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = `Receipt_${this.currentReceipt.id}.txt`;
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                },
+
+                copyReceipt() {
+                    const text = this.receiptText();
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text)
+                            .then(() => jbToast('Receipt copied — paste it into WhatsApp, SMS or a note.'))
+                            .catch(() => jbToast('Copying was blocked. Select the receipt text to copy it by hand.'));
+                    } else {
+                        jbToast('Copying is not available here. Select the receipt text to copy it by hand.');
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
