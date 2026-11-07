@@ -689,6 +689,24 @@
                             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer">Save Settings</button>
                         </form>
                     </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-rose-200 max-w-2xl space-y-3">
+                        <h3 class="text-lg font-bold text-slate-800 border-b pb-3">Clear Test Data</h3>
+                        <p class="text-sm text-slate-600">
+                            Deletes every sale and every sales return saved on this device, for when the records so far were
+                            only practice runs. Stock sold on those sales is added back, so your quantities are correct again.
+                            Products, customers, repairs and expenses are left untouched.
+                        </p>
+                        <p class="text-xs text-slate-500">
+                            This device currently holds
+                            <span class="font-bold" x-text="sales.length"></span> sale(s) and
+                            <span class="font-bold" x-text="returnsLog.length"></span> return(s).
+                        </p>
+                        <button @click="askClearSales()" :disabled="sales.length === 0 && returnsLog.length === 0"
+                            class="bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer">
+                            Clear Sales &amp; Returns
+                        </button>
+                    </div>
                 </div>
 
             </div>
@@ -749,6 +767,24 @@
                 <div class="flex space-x-2 pt-1">
                     <button @click="pendingReturn = null" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-sm cursor-pointer">Cancel</button>
                     <button @click="confirmReturn()" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded text-sm cursor-pointer">Yes, restock</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirm Clear Test Data Modal -->
+        <div x-show="pendingWipe" class="fixed inset-0 bg-slate-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl">
+                <h3 class="text-base font-bold text-slate-900">Erase all sales and returns?</h3>
+                <p class="text-sm text-slate-600">
+                    <span class="font-bold" x-text="pendingWipe ? pendingWipe.sales : 0"></span> sale(s) and
+                    <span class="font-bold" x-text="pendingWipe ? pendingWipe.returns : 0"></span> return(s) will be deleted
+                    from this device, and
+                    <span class="font-bold" x-text="pendingWipe ? pendingWipe.units : 0"></span> item(s) of stock will go
+                    back into inventory. This cannot be undone.
+                </p>
+                <div class="flex space-x-2 pt-1">
+                    <button @click="pendingWipe = null" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-sm cursor-pointer">Cancel</button>
+                    <button @click="confirmClearSales()" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded text-sm cursor-pointer">Yes, erase</button>
                 </div>
             </div>
         </div>
@@ -831,6 +867,7 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
                 selectedSaleForReturn: null,
                 returnReason: '',
                 pendingReturn: null,
+                pendingWipe: null,
                 returnsLog: jbGet('jb_returns_log_zmw_v2') || [],
 
                 storeSettings: jbGet('jb_settings_v2') || {
@@ -1074,6 +1111,33 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
                     this.returnSearchId = '';
                     this.saveData();
                     jbToast('Sale return processed and items restocked successfully!');
+                },
+
+                askClearSales() {
+                    let units = this.sales.filter(s => !s.returned)
+                        .reduce((n, s) => n + (s.items || []).reduce((m, i) => m + i.qty, 0), 0);
+                    this.pendingWipe = { sales: this.sales.length, returns: this.returnsLog.length, units };
+                },
+
+                confirmClearSales() {
+                    // Put back the stock those sales took out. A sale already marked
+                    // returned had its stock restored at the time, so skip it.
+                    this.sales.filter(s => !s.returned).forEach(sale => {
+                        (sale.items || []).forEach(cartItem => {
+                            let invItem = this.inventory.find(i => i.name === cartItem.name && i.condition === cartItem.condition);
+                            if (invItem) invItem.stock += cartItem.qty;
+                        });
+                    });
+
+                    let soldCount = this.sales.length;
+                    let returnCount = this.returnsLog.length;
+                    this.sales = [];
+                    this.returnsLog = [];
+                    this.selectedSaleForReturn = null;
+                    this.returnSearchId = '';
+                    this.pendingWipe = null;
+                    this.saveData();
+                    jbToast(`Cleared ${soldCount} sale(s) and ${returnCount} return(s). Stock has been put back.`);
                 },
 
                 addRepair() {
