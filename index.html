@@ -74,11 +74,44 @@
                            class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 <p x-show="loginError" x-text="loginError" class="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2"></p>
+                <p x-show="loginNote" x-text="loginNote" class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2"></p>
                 <button type="submit" :disabled="busy"
                         class="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 text-sm transition cursor-pointer"
                         x-text="busy ? 'Signing in…' : 'Sign in'"></button>
             </form>
+            <button @click="sendReset()" :disabled="busy"
+                    class="w-full text-xs text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50 cursor-pointer">
+                Forgot your password?
+            </button>
             <p class="text-[11px] text-slate-400 text-center">No account? Ask the shop owner or an admin to set one up for you.</p>
+        </div>
+    </div>
+
+    <!-- ============ CHOOSE A NEW PASSWORD ============ -->
+    <!-- Reached from the link in a password recovery email. -->
+    <div x-show="stage === 'reset'" class="jb-screen flex items-center justify-center bg-slate-900 p-4">
+        <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-7 space-y-5">
+            <div class="text-center space-y-2">
+                <img src="logo-mark.png" alt="JB Gadgets Store logo" class="h-14 w-auto mx-auto">
+                <h1 class="text-base font-bold text-slate-900">Choose a new password</h1>
+                <p class="text-xs text-slate-500">At least 8 characters.</p>
+            </div>
+            <form @submit.prevent="setNewPassword()" class="space-y-3">
+                <div>
+                    <label for="jb-new-password" class="block text-xs font-semibold text-slate-600 mb-1">New password</label>
+                    <input id="jb-new-password" type="password" x-model="newPassword" autocomplete="new-password" minlength="8" required
+                           class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="jb-new-password2" class="block text-xs font-semibold text-slate-600 mb-1">Type it again</label>
+                    <input id="jb-new-password2" type="password" x-model="newPassword2" autocomplete="new-password" minlength="8" required
+                           class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <p x-show="loginError" x-text="loginError" class="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2"></p>
+                <button type="submit" :disabled="busy"
+                        class="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 text-sm transition cursor-pointer"
+                        x-text="busy ? 'Saving…' : 'Save new password'"></button>
+            </form>
         </div>
     </div>
 
@@ -966,7 +999,8 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
                 // ---- session ----
                 stage: 'loading',            // loading | signin | pending | ready
                 profile: { full_name: '', role: 'cashier', is_active: false },
-                loginEmail: '', loginPassword: '', loginError: '', busy: false,
+                loginEmail: '', loginPassword: '', loginError: '', loginNote: '', busy: false,
+                newPassword: '', newPassword2: '',
                 online: navigator.onLine,
                 queuedSales: jbGet('jb_queued_sales') || [],
 
@@ -1023,12 +1057,23 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
                     window.addEventListener('online', () => { this.online = true; this.flushQueue(); });
                     window.addEventListener('offline', () => { this.online = false; });
 
-                    const { data } = await sb.auth.getSession();
-                    await this.afterSession(data.session);
-
-                    sb.auth.onAuthStateChange((_event, session) => {
-                        if (!session) { this.stage = 'signin'; }
+                    // Arriving from a recovery email: Supabase signs the person
+                    // in briefly so they can set a new password. Catch that
+                    // before the normal startup sends them into the app.
+                    let recovering = false;
+                    sb.auth.onAuthStateChange((event, session) => {
+                        if (event === 'PASSWORD_RECOVERY') { recovering = true; this.stage = 'reset'; return; }
+                        if (!session && this.stage !== 'reset') { this.stage = 'signin'; }
                     });
+
+                    if (window.location.hash.includes('type=recovery')) {
+                        this.stage = 'reset';
+                        return;
+                    }
+
+                    const { data } = await sb.auth.getSession();
+                    if (recovering || this.stage === 'reset') return;
+                    await this.afterSession(data.session);
                 },
 
                 async afterSession(session) {
@@ -1067,6 +1112,44 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
                     }
                     this.loginPassword = '';
                     await this.afterSession(data.session);
+                },
+
+                async sendReset() {
+                    if (!sb) { this.loginError = 'No connection. Try again once you are back online.'; return; }
+                    const email = this.loginEmail.trim();
+                    if (!email) { this.loginError = 'Type your email address above first, then tap this again.'; return; }
+                    this.loginError = ''; this.loginNote = ''; this.busy = true;
+                    const { error } = await sb.auth.resetPasswordForEmail(email, {
+                        redirectTo: window.location.origin + window.location.pathname
+                    });
+                    this.busy = false;
+                    if (error) { this.loginError = error.message; return; }
+                    // Said the same way whether or not the address exists, so this
+                    // cannot be used to find out who has an account.
+                    this.loginNote = 'If that email has an account, a reset link is on its way. Check your inbox and spam folder.';
+                },
+
+                async setNewPassword() {
+                    if (this.newPassword !== this.newPassword2) {
+                        this.loginError = 'Those two passwords are not the same.'; return;
+                    }
+                    if (this.newPassword.length < 8) {
+                        this.loginError = 'Use at least 8 characters.'; return;
+                    }
+                    this.loginError = ''; this.busy = true;
+                    const { error } = await sb.auth.updateUser({ password: this.newPassword });
+                    this.busy = false;
+                    if (error) {
+                        this.loginError = error.message.includes('expired')
+                            ? 'That reset link has expired. Ask for a new one from the sign-in screen.'
+                            : error.message;
+                        return;
+                    }
+                    this.newPassword = ''; this.newPassword2 = '';
+                    history.replaceState(null, '', window.location.pathname);
+                    const { data } = await sb.auth.getSession();
+                    await this.afterSession(data.session);
+                    jbToast('Password changed. You are signed in.');
                 },
 
                 async signOut() {
