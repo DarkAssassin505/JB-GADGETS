@@ -4,9 +4,15 @@
 -- Paste this whole file into Supabase: SQL Editor -> New query -> Run.
 -- It is safe to run more than once.
 --
--- One shop, staff with their own logins, two roles:
---   admin   - sees cost prices, profit, expenses and settings
+-- One shop, staff with their own logins, three roles:
+--   owner   - everything an admin can do, and invisible to everyone else.
+--             No other signed-in user can see that this account exists.
+--   admin   - sees cost prices, profit, expenses and settings, and brings
+--             new staff on board. Cannot see, change or create an owner.
 --   cashier - sells, books repairs, handles customers; no cost or profit
+--
+-- New sign-ups arrive switched off and see nothing until an owner or an
+-- admin switches them on, so a stranger finding the page gains nothing.
 --
 -- Money is stored as numeric(12,2), which is exact to the ngwee.
 -- =====================================================================
@@ -21,12 +27,24 @@
 create table if not exists public.profiles (
     id         uuid primary key references auth.users (id) on delete cascade,
     full_name  text not null default 'New staff member',
-    role       text not null default 'cashier' check (role in ('admin', 'cashier')),
-    is_active  boolean not null default true,
+    role       text not null default 'cashier' check (role in ('owner', 'admin', 'cashier')),
+    is_active  boolean not null default false,
     created_at timestamptz not null default now()
 );
 
--- Anyone who signs up starts as a cashier. You promote them afterwards.
+-- If this is an upgrade from the two-role version, widen the rule and
+-- make sure nobody is left switched on by accident.
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check
+    check (role in ('owner', 'admin', 'cashier'));
+alter table public.profiles alter column is_active set default false;
+
+-- There is exactly one owner. Remove this line if you ever want two.
+create unique index if not exists profiles_single_owner
+    on public.profiles ((role)) where role = 'owner';
+
+-- Anyone who signs up starts as a switched-off cashier, so an account
+-- alone grants nothing until somebody approves it.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -48,6 +66,21 @@ create trigger on_auth_user_created
 
 -- Asking "is the person signed in an admin?" inside a security rule would
 -- loop forever if it read the table normally, so it goes through this.
+create or replace function public.is_owner()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+    select exists (
+        select 1 from public.profiles
+        where id = auth.uid() and role = 'owner' and is_active
+    );
+$$;
+
+-- The owner can do everything an admin can, so every admin rule below
+-- covers the owner too.
 create or replace function public.is_admin()
 returns boolean
 language sql
@@ -57,7 +90,7 @@ set search_path = public
 as $$
     select exists (
         select 1 from public.profiles
-        where id = auth.uid() and role = 'admin' and is_active
+        where id = auth.uid() and role in ('owner', 'admin') and is_active
     );
 $$;
 
@@ -302,15 +335,20 @@ $$;
 -- anyone could still read it out of the connection.
 
 -- A view runs with its owner's permissions, so these two reach the tables
--- that cashiers themselves cannot open.
+-- that cashiers themselves cannot open. That also means the row rules do
+-- NOT apply to them, so each one has to check for itself that the caller
+-- is active staff. Without that line, anyone who merely holds a login
+-- could read the catalogue.
 
 create or replace view public.inventory_for_sale as
     select id, name, category, condition, selling_price, stock
-    from public.inventory;
+    from public.inventory
+    where public.is_staff();
 
 create or replace view public.sale_items_for_receipt as
     select id, sale_id, name, category, condition, selling_price, qty
-    from public.sale_items;
+    from public.sale_items
+    where public.is_staff();
 
 revoke all on public.inventory_for_sale from anon, authenticated;
 revoke all on public.sale_items_for_receipt from anon, authenticated;
@@ -349,11 +387,24 @@ begin
 end;
 $$;
 
--- Staff see the staff list and their own row; only an admin can change it.
+-- The staff list. Everyone sees their own row, even before being
+-- switched on, so the app can tell them they are waiting for approval.
+-- Staff see each other, but the owner's row is filtered out for them:
+-- to everyone except the owner, that account does not appear to exist.
 create policy staff_read on public.profiles
-    for select to authenticated using (public.is_staff());
+    for select to authenticated
+    using (
+        id = auth.uid()
+        or public.is_owner()
+        or (public.is_staff() and role <> 'owner')
+    );
+
+-- Admins bring staff on board and set their role, but cannot touch the
+-- owner's row and cannot make anyone an owner, themselves included.
 create policy admin_all on public.profiles
-    for all to authenticated using (public.is_admin()) with check (public.is_admin());
+    for all to authenticated
+    using      (public.is_owner() or (public.is_admin() and role <> 'owner'))
+    with check (public.is_owner() or (public.is_admin() and role <> 'owner'));
 
 -- Cost prices: admin only. Cashiers use inventory_for_sale instead.
 create policy admin_all on public.inventory
@@ -410,9 +461,29 @@ on conflict do nothing;
 
 
 -- =====================================================================
--- After running this, make yourself the admin. Replace the email with
--- the one you signed up with, and run it on its own:
+-- AFTER RUNNING THIS
 --
---   update public.profiles set role = 'admin', full_name = 'Boyd Longwe'
+-- Add the logins under Authentication -> Users first, then run the two
+-- lines below on their own, with the real email addresses in them.
+-- Every new account starts switched off, so this also switches them on.
+--
+-- 1. Make yourself the owner:
+--
+--   update public.profiles
+--   set role = 'owner', full_name = 'Boyd Longwe', is_active = true
 --   where id = (select id from auth.users where email = 'you@example.com');
+--
+-- 2. Make Joseph an admin, so he can bring the rest of the staff on:
+--
+--   update public.profiles
+--   set role = 'admin', full_name = 'Joseph', is_active = true
+--   where id = (select id from auth.users where email = 'joseph@example.com');
+--
+-- Each should answer UPDATE 1. UPDATE 0 means the email does not match
+-- a login you created.
+--
+-- NOTE: this hides the owner from everyone inside the app. It cannot
+-- hide anything from someone you invite into the Supabase dashboard
+-- itself, because the dashboard works beneath these rules. Keep the
+-- dashboard to yourself.
 -- =====================================================================
