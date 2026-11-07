@@ -6,8 +6,8 @@
     <title>JB Gadgets Store - Store &amp; Repair Manager</title>
     <meta name="description" content="JB Gadgets Store - stock, point of sale, returns, repairs and customers. Affordability &amp; Authenticity.">
     <meta name="theme-color" content="#0f172a">
-    <link rel="icon" href="image_1.png">
-    <link rel="apple-touch-icon" href="image_1.png">
+    <link rel="icon" href="logo-mark.png">
+    <link rel="apple-touch-icon" href="logo-mark.png">
     <!-- Tailwind CSS, pinned to a fixed version -->
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <!-- Alpine.js, pinned to a fixed version -->
@@ -51,12 +51,13 @@
         <!-- Sidebar Navigation (Updated Background and Logo) -->
         <aside class="hidden md:flex w-64 bg-slate-900 text-white flex-col shadow-xl z-30">
             <div class="p-5 border-b border-slate-850 text-center">
-                <!-- Place the Logo Design Image Element -->
-                <img src="image_1.png" alt="JB Gadgets Store Logo" class="h-24 w-auto mx-auto mb-3">
-                
-                <!-- Logo Tagline Text (from logo image) -->
-                <p class="text-xs text-white font-medium">AFFORDABILITY & AUTHENTICITY</p>
-                <p class="text-[10px] text-white mt-2" x-text="storeSettings.location + ' Store Manager'">Lusaka, Zambia Store Manager</p>
+                <!-- White cart mark, for the dark sidebar -->
+                <img src="logo-mark-white.png" alt="JB Gadgets Store logo" class="h-20 w-auto mx-auto mb-3">
+
+                <!-- Store name and tagline, previously only inside the logo image -->
+                <p class="text-sm text-white font-bold tracking-wide">JB GADGETS STORE</p>
+                <p class="text-[10px] text-white/70 font-medium tracking-[0.14em] mt-1">AFFORDABILITY &amp; AUTHENTICITY</p>
+                <p class="text-[10px] text-white/60 mt-2" x-text="storeSettings.location + ' Store Manager'">Lusaka, Zambia Store Manager</p>
             </div>
             <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
                 <button @click="currentTab = 'dashboard'" :class="currentTab === 'dashboard' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
@@ -103,7 +104,7 @@
             <!-- Top Header Bar (Updated) -->
             <header class="bg-white shadow-sm h-16 flex items-center justify-between px-4 md:px-8 border-b sticky top-0 z-20">
                 <div class="flex items-center space-x-2">
-                    <img src="image_1.png" alt="Logo" class="h-8 w-auto md:hidden">
+                    <img src="logo-mark.png" alt="JB Gadgets Store logo" class="h-8 w-auto md:hidden">
                     <span class="text-slate-300 md:hidden">|</span>
                     <h2 class="text-base md:text-xl font-semibold capitalize text-slate-800" x-text="currentTab === 'pos' ? 'Point of Sale' : (currentTab === 'returns' ? 'Sales Returns' : currentTab)"></h2>
                 </div>
