@@ -11,6 +11,9 @@
     <!-- Tailwind CSS, pinned to a fixed version -->
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <!-- Alpine.js, pinned to a fixed version -->
+    <!-- Supabase client, pinned -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+    <!-- Alpine.js (pinned). Loads last so the app script is defined first. -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
@@ -45,8 +48,88 @@
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans">
 
-    <div class="flex flex-col md:flex-row jb-screen overflow-hidden bg-slate-100 text-slate-800 font-sans"
-     x-data="storeApp()" x-cloak>
+    <div x-data="storeApp()" x-cloak>
+
+    <!-- ============ SIGN IN ============ -->
+    <div x-show="stage === 'loading'" class="jb-screen flex items-center justify-center bg-slate-100">
+        <p class="text-sm text-slate-500">Loading…</p>
+    </div>
+
+    <div x-show="stage === 'signin'" class="jb-screen flex items-center justify-center bg-slate-900 p-4">
+        <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-7 space-y-5">
+            <div class="text-center space-y-2">
+                <img src="logo-mark.png" alt="JB Gadgets Store logo" class="h-16 w-auto mx-auto">
+                <h1 class="text-lg font-bold text-slate-900">JB GADGETS STORE</h1>
+                <p class="text-[10px] tracking-[0.14em] text-slate-400 font-medium">AFFORDABILITY &amp; AUTHENTICITY</p>
+            </div>
+            <form @submit.prevent="signIn()" class="space-y-3">
+                <div>
+                    <label for="jb-email" class="block text-xs font-semibold text-slate-600 mb-1">Email</label>
+                    <input id="jb-email" type="email" x-model="loginEmail" autocomplete="username" required
+                           class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="jb-password" class="block text-xs font-semibold text-slate-600 mb-1">Password</label>
+                    <input id="jb-password" type="password" x-model="loginPassword" autocomplete="current-password" required
+                           class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <p x-show="loginError" x-text="loginError" class="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2"></p>
+                <p x-show="loginNote" x-text="loginNote" class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2"></p>
+                <button type="submit" :disabled="busy"
+                        class="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 text-sm transition cursor-pointer"
+                        x-text="busy ? 'Signing in…' : 'Sign in'"></button>
+            </form>
+            <button @click="sendReset()" :disabled="busy"
+                    class="w-full text-xs text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50 cursor-pointer">
+                Forgot your password?
+            </button>
+            <p class="text-[11px] text-slate-400 text-center">No account? Ask the shop owner or an admin to set one up for you.</p>
+        </div>
+    </div>
+
+    <!-- ============ CHOOSE A NEW PASSWORD ============ -->
+    <!-- Reached from the link in a password recovery email. -->
+    <div x-show="stage === 'reset'" class="jb-screen flex items-center justify-center bg-slate-900 p-4">
+        <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-7 space-y-5">
+            <div class="text-center space-y-2">
+                <img src="logo-mark.png" alt="JB Gadgets Store logo" class="h-14 w-auto mx-auto">
+                <h1 class="text-base font-bold text-slate-900">Choose a new password</h1>
+                <p class="text-xs text-slate-500">At least 8 characters.</p>
+            </div>
+            <form @submit.prevent="setNewPassword()" class="space-y-3">
+                <div>
+                    <label for="jb-new-password" class="block text-xs font-semibold text-slate-600 mb-1">New password</label>
+                    <input id="jb-new-password" type="password" x-model="newPassword" autocomplete="new-password" minlength="8" required
+                           class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="jb-new-password2" class="block text-xs font-semibold text-slate-600 mb-1">Type it again</label>
+                    <input id="jb-new-password2" type="password" x-model="newPassword2" autocomplete="new-password" minlength="8" required
+                           class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <p x-show="loginError" x-text="loginError" class="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2"></p>
+                <button type="submit" :disabled="busy"
+                        class="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 text-sm transition cursor-pointer"
+                        x-text="busy ? 'Saving…' : 'Save new password'"></button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============ SIGNED IN BUT NOT YET APPROVED ============ -->
+    <div x-show="stage === 'pending'" class="jb-screen flex items-center justify-center bg-slate-900 p-4">
+        <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-7 space-y-4 text-center">
+            <img src="logo-mark.png" alt="JB Gadgets Store logo" class="h-14 w-auto mx-auto">
+            <h1 class="text-base font-bold text-slate-900">Waiting for approval</h1>
+            <p class="text-sm text-slate-600">
+                Your account exists but has not been switched on yet. Ask the shop owner or an admin
+                to approve it, then sign in again.
+            </p>
+            <button @click="signOut()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg py-2.5 text-sm cursor-pointer">Sign out</button>
+        </div>
+    </div>
+
+    <!-- ============ THE APP ============ -->
+    <div x-show="stage === 'ready'" class="flex flex-col md:flex-row jb-screen overflow-hidden bg-slate-100 text-slate-800 font-sans">
 
         <!-- Sidebar Navigation (Updated Background and Logo) -->
         <aside class="hidden md:flex w-64 bg-slate-900 text-white flex-col shadow-xl z-30">
@@ -109,13 +192,20 @@
                     <h2 class="text-base md:text-xl font-semibold capitalize text-slate-800" x-text="currentTab === 'pos' ? 'Point of Sale' : (currentTab === 'returns' ? 'Sales Returns' : currentTab)"></h2>
                 </div>
                 
-                <!-- Role Selector Toggle -->
-                <div class="flex items-center space-x-3">
-                    <span class="text-xs font-medium text-slate-500">Role View:</span>
-                    <select x-model="userRole" class="border rounded-lg px-3 py-1.5 text-xs font-semibold bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" :class="userRole === 'admin' ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200'">
-                        <option value="admin">Admin / Manager</option>
-                        <option value="cashier">Cashier</option>
-                    </select>
+                <!-- Who is signed in. The role comes from the database, not a
+                     dropdown: picking your own role is what we are preventing. -->
+                <div class="flex items-center space-x-2 md:space-x-3">
+                    <span x-show="!online" class="inline-flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                        <span>Offline<span x-show="queuedSales.length" x-text="' · ' + queuedSales.length + ' to sync'"></span></span>
+                    </span>
+                    <div class="text-right hidden sm:block">
+                        <p class="text-xs font-semibold text-slate-700 leading-tight" x-text="profile.full_name"></p>
+                        <p class="text-[10px] uppercase tracking-wide leading-tight"
+                           :class="profile.role === 'cashier' ? 'text-emerald-600' : 'text-blue-600'"
+                           x-text="profile.role"></p>
+                    </div>
+                    <button @click="signOut()" class="border rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">Sign out</button>
                 </div>
             </header>
 
@@ -294,7 +384,7 @@
                                         <td x-show="userRole === 'admin'" class="p-4 text-blue-700 font-medium">
                                             <div class="flex items-center space-x-1">
                                                 <span class="text-xs" x-text="storeSettings.currency"></span>
-                                                <input type="number" x-model.number="item.costPrice" @change="saveData" class="w-24 border rounded px-1.5 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white" min="0" step="0.01">
+                                                <input type="number" x-model.number="item.costPrice" @change="updateItem(item)" class="w-24 border rounded px-1.5 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white" min="0" step="0.01">
                                             </div>
                                         </td>
                                         
@@ -303,7 +393,7 @@
                                             <template x-if="userRole === 'admin'">
                                                 <div class="flex items-center space-x-1">
                                                     <span class="text-xs text-emerald-700" x-text="storeSettings.currency"></span>
-                                                    <input type="number" x-model.number="item.sellingPrice" @change="saveData" class="w-24 border border-emerald-300 rounded px-1.5 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500 bg-emerald-50 text-emerald-800 font-bold" min="0" step="0.01">
+                                                    <input type="number" x-model.number="item.sellingPrice" @change="updateItem(item)" class="w-24 border border-emerald-300 rounded px-1.5 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500 bg-emerald-50 text-emerald-800 font-bold" min="0" step="0.01">
                                                 </div>
                                             </template>
                                             <template x-if="userRole !== 'admin'">
@@ -314,7 +404,7 @@
                                         <!-- Stock Qty Adjustments -->
                                         <td class="p-4">
                                             <template x-if="userRole === 'admin'">
-                                                <input type="number" x-model.number="item.stock" @change="saveData" class="w-16 border rounded px-1.5 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white" min="0">
+                                                <input type="number" x-model.number="item.stock" @change="updateItem(item)" class="w-16 border rounded px-1.5 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 bg-white" min="0">
                                             </template>
                                             <template x-if="userRole !== 'admin'">
                                                 <span :class="item.stock < 3 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'" class="px-2.5 py-1 rounded-md text-xs font-medium" x-text="item.stock"></span>
@@ -566,7 +656,7 @@
                                         <td class="p-4" x-text="repair.device"></td>
                                         <td class="p-4 text-slate-600" x-text="repair.issue"></td>
                                         <td class="p-4">
-                                            <select x-model="repair.status" @change="saveData" class="border rounded-md px-2 py-1 text-xs font-medium cursor-pointer" :class="{
+                                            <select x-model="repair.status" @change="updateRepair(repair)" class="border rounded-md px-2 py-1 text-xs font-medium cursor-pointer" :class="{
                                                 'bg-amber-50 text-amber-700': repair.status === 'Pending',
                                                 'bg-blue-50 text-blue-700': repair.status === 'In Progress',
                                                 'bg-emerald-50 text-emerald-700': repair.status === 'Ready',
@@ -582,7 +672,7 @@
                                             <a :href="waLink(repair)" target="_blank" rel="noopener" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-2.5 py-1.5 rounded transition inline-flex items-center space-x-1 cursor-pointer">
                                                 <span>WhatsApp</span>
                                             </a>
-                                            <button @click="deleteRepair(index)" class="text-rose-500 hover:text-rose-700 text-xs font-medium p-1 cursor-pointer">Delete</button>
+                                            <button @click="deleteRepair(repair)" class="text-rose-500 hover:text-rose-700 text-xs font-medium p-1 cursor-pointer">Delete</button>
                                         </td>
                                     </tr>
                                 </template>
@@ -619,7 +709,7 @@
                                         <td class="p-4 text-slate-600" x-text="cust.phone"></td>
                                         <td class="p-4 text-emerald-600 font-semibold" x-text="storeSettings.currency + ' ' + getCustomerSpent(cust.name).toFixed(2)"></td>
                                         <td class="p-4 text-right">
-                                            <button @click="deleteCustomer(index)" class="text-rose-500 hover:text-rose-700 text-xs font-medium p-1 cursor-pointer">Delete</button>
+                                            <button @click="deleteCustomer(cust)" class="text-rose-500 hover:text-rose-700 text-xs font-medium p-1 cursor-pointer">Delete</button>
                                         </td>
                                     </tr>
                                 </template>
@@ -656,7 +746,7 @@
                                         <td class="p-4 font-medium text-slate-800" x-text="exp.description"></td>
                                         <td class="p-4 text-right text-rose-600 font-semibold" x-text="'-' + storeSettings.currency + ' ' + parseFloat(exp.amount).toFixed(2)"></td>
                                         <td class="p-4 text-right">
-                                            <button @click="deleteExpense(index)" class="text-rose-500 hover:text-rose-700 text-xs font-medium p-1 cursor-pointer">Delete</button>
+                                            <button @click="deleteExpense(exp)" class="text-rose-500 hover:text-rose-700 text-xs font-medium p-1 cursor-pointer">Delete</button>
                                         </td>
                                     </tr>
                                 </template>
@@ -807,20 +897,37 @@
                 <span>Settings</span>
             </button>
         </nav>
-    </div>
+    </div><!-- /the app -->
+    </div><!-- /x-data root -->
 
     <!-- JavaScript App Logic -->
     <script>
-        // Browser storage can be switched off or full; never let that blank the app.
+        // ================= CONNECTION =================
+        // These two values are safe in public code. They grant nothing on
+        // their own: the database decides what each signed-in person may
+        // see, and a stranger holding them gets nothing at all.
+        const SUPABASE_URL = 'https://ririkbajiojpcrllgivn.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpcmlrYmFqaW9qcGNybGxnaXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwNjM4ODEsImV4cCI6MjEwOTYzOTg4MX0.J1Ms4gMI7GQJSkBy9srIXxxmA-6SjsTiygQJd0AOIeE';
+
+        // On a bad line the library may not arrive at all. Without this guard
+        // the whole page would fail to start and show nothing but white.
+        const sb = (window.supabase && window.supabase.createClient)
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+            : null;
+
+        // ================= LOCAL CACHE =================
+        // Browser storage is no longer where the books live. It holds a copy
+        // of what was last loaded, so the shop can still see its stock when
+        // the internet drops, plus any sale waiting to be sent.
         function jbGet(key) {
             try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; }
             catch (e) { return null; }
         }
         function jbSet(key, value) {
-            try { localStorage.setItem(key, value); } catch (e) { /* storage unavailable */ }
+            try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* storage unavailable */ }
         }
 
-        // In-page message bar, used instead of browser pop-ups.
+        // ================= MESSAGE BAR =================
         let jbToastTimer;
         function jbToast(msg) {
             clearTimeout(jbToastTimer);
@@ -833,8 +940,48 @@
             }
             el.textContent = msg;
             el.classList.add('show');
-            jbToastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+            jbToastTimer = setTimeout(() => el.classList.remove('show'), 4000);
         }
+
+        // ================= SHAPES =================
+        // The database uses under_scores, the screens use camelCase.
+        const toItem = r => ({
+            id: r.id, name: r.name, category: r.category, condition: r.condition,
+            costPrice: Number(r.cost_price ?? 0), sellingPrice: Number(r.selling_price),
+            stock: Number(r.stock)
+        });
+        const toSaleLine = r => ({
+            name: r.name, category: r.category, condition: r.condition,
+            costPrice: Number(r.cost_price ?? 0), sellingPrice: Number(r.selling_price),
+            qty: Number(r.qty)
+        });
+        const toSale = r => ({
+            id: r.id,
+            date: new Date(r.sold_at).toLocaleString(),
+            customerName: r.customer_name || '',
+            saleType: r.sale_type,
+            subtotal: Number(r.subtotal),
+            discount: Number(r.discount),
+            tradeInDevice: r.trade_in_device || '',
+            tradeInValue: Number(r.trade_in_value),
+            total: Number(r.total),
+            returned: r.returned,
+            items: []
+        });
+        const toReturn = r => ({
+            id: r.id, saleId: r.sale_id,
+            returnDate: new Date(r.return_date).toLocaleString(),
+            reason: r.reason, refundTotal: Number(r.refund_total)
+        });
+        const toExpense = r => ({
+            id: r.id, date: r.spent_on, description: r.description, amount: Number(r.amount)
+        });
+
+        const uuid = () => (crypto.randomUUID ? crypto.randomUUID()
+            : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            }));
 
         // EMBEDDED DEFAULT INVENTORY CSV DATA
         const EMBEDDED_CSV_DATA = `name,category,condition,costPrice,sellingPrice,stock
@@ -849,8 +996,23 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
 
         function storeApp() {
             return {
+                // ---- session ----
+                stage: 'loading',            // loading | signin | pending | ready
+                profile: { full_name: '', role: 'cashier', is_active: false },
+                loginEmail: '', loginPassword: '', loginError: '', loginNote: '', busy: false,
+                newPassword: '', newPassword2: '',
+                online: navigator.onLine,
+                queuedSales: jbGet('jb_queued_sales') || [],
+
+                // Keeps every x-show="userRole === 'admin'" in the page working.
+                // The owner gets everything an admin gets.
+                get userRole() {
+                    return (this.profile.role === 'owner' || this.profile.role === 'admin')
+                        ? 'admin' : 'cashier';
+                },
+
+                // ---- screen state ----
                 currentTab: 'dashboard',
-                userRole: 'admin',
                 searchQuery: '',
                 selectedCategory: 'All',
                 selectedCondition: 'All',
@@ -861,52 +1023,215 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
                 discountAmount: 0,
                 tradeInDevice: '',
                 tradeInValue: 0,
-                
-                // Sales Returns State
                 returnSearchId: '',
                 selectedSaleForReturn: null,
                 returnReason: '',
                 pendingReturn: null,
                 pendingWipe: null,
-                returnsLog: jbGet('jb_returns_log_zmw_v2') || [],
 
-                storeSettings: jbGet('jb_settings_v2') || {
-                    storeName: 'JB GADGETS STORE',
-                    location: 'Lusaka, Zambia',
-                    currency: 'ZMW',
-                    receiptFooter: 'Thank you for your business!'
+                // ---- the books ----
+                storeSettings: jbGet('jb_cache_settings') || {
+                    storeName: 'JB GADGETS STORE', location: 'Lusaka, Zambia',
+                    currency: 'ZMW', receiptFooter: 'Thank you for your business!'
                 },
-                inventory: jbGet('jb_inventory_zmw_v2') || [
-                    { name: 'iPhone 15 Pro', category: 'Phones', condition: 'Brand New', costPrice: 18000, sellingPrice: 22000, stock: 5 },
-                    { name: 'iPhone 13 128GB', category: 'Phones', condition: 'Pre-Owned', costPrice: 9000, sellingPrice: 11500, stock: 3 },
-                    { name: 'AirPods Pro 2', category: 'Accessories', condition: 'Brand New', costPrice: 3500, sellingPrice: 4500, stock: 4 },
-                    { name: 'PlayStation 5', category: 'Consoles', condition: 'Brand New', costPrice: 10000, sellingPrice: 12500, stock: 2 }
-                ],
-                sales: jbGet('jb_sales_zmw_v2') || [],
-                repairs: jbGet('jb_repairs_zmw_v2') || [],
-                customers: jbGet('jb_customers_zmw_v2') || [],
-                expenses: jbGet('jb_expenses_zmw_v2') || [],
+                inventory: jbGet('jb_cache_inventory') || [],
+                sales: jbGet('jb_cache_sales') || [],
+                returnsLog: jbGet('jb_cache_returns') || [],
+                repairs: jbGet('jb_cache_repairs') || [],
+                customers: jbGet('jb_cache_customers') || [],
+                expenses: jbGet('jb_cache_expenses') || [],
+
                 newItem: { name: '', category: 'Phones', condition: 'Brand New', costPrice: '', sellingPrice: '', stock: '' },
                 newRepair: { customer: '', phone: '', device: '', issue: '', status: 'Pending' },
                 newCustomer: { name: '', phone: '' },
                 newExpense: { description: '', amount: '' },
                 cart: [],
 
-                saveData() {
-                    jbSet('jb_inventory_zmw_v2', JSON.stringify(this.inventory));
-                    jbSet('jb_sales_zmw_v2', JSON.stringify(this.sales));
-                    jbSet('jb_repairs_zmw_v2', JSON.stringify(this.repairs));
-                    jbSet('jb_customers_zmw_v2', JSON.stringify(this.customers));
-                    jbSet('jb_expenses_zmw_v2', JSON.stringify(this.expenses));
-                    jbSet('jb_settings_v2', JSON.stringify(this.storeSettings));
-                    jbSet('jb_returns_log_zmw_v2', JSON.stringify(this.returnsLog));
+                // ================= STARTUP =================
+                async init() {
+                    if (!sb) {
+                        this.stage = 'signin';
+                        this.loginError = 'Could not load the sign-in system. Check your internet connection and reload the page.';
+                        return;
+                    }
+                    window.addEventListener('online', () => { this.online = true; this.flushQueue(); });
+                    window.addEventListener('offline', () => { this.online = false; });
+
+                    // Arriving from a recovery email: Supabase signs the person
+                    // in briefly so they can set a new password. Catch that
+                    // before the normal startup sends them into the app.
+                    let recovering = false;
+                    sb.auth.onAuthStateChange((event, session) => {
+                        if (event === 'PASSWORD_RECOVERY') { recovering = true; this.stage = 'reset'; return; }
+                        if (!session && this.stage !== 'reset') { this.stage = 'signin'; }
+                    });
+
+                    if (window.location.hash.includes('type=recovery')) {
+                        this.stage = 'reset';
+                        return;
+                    }
+
+                    const { data } = await sb.auth.getSession();
+                    if (recovering || this.stage === 'reset') return;
+                    await this.afterSession(data.session);
                 },
 
-                saveSettings() {
-                    this.saveData();
-                    jbToast('Settings updated successfully!');
+                async afterSession(session) {
+                    if (!session) { this.stage = 'signin'; return; }
+
+                    const { data: me, error } = await sb
+                        .from('profiles')
+                        .select('full_name, role, is_active')
+                        .eq('id', session.user.id)
+                        .maybeSingle();
+
+                    if (error) { this.stage = 'signin'; this.loginError = error.message; return; }
+                    if (!me) { this.stage = 'pending'; return; }
+
+                    this.profile = me;
+                    if (!me.is_active) { this.stage = 'pending'; return; }
+
+                    this.stage = 'ready';
+                    await this.loadAll();
+                    this.flushQueue();
                 },
 
+                async signIn() {
+                    if (!sb) { this.loginError = 'Still no connection. Reload the page once you are back online.'; return; }
+                    this.loginError = '';
+                    this.busy = true;
+                    const { data, error } = await sb.auth.signInWithPassword({
+                        email: this.loginEmail.trim(), password: this.loginPassword
+                    });
+                    this.busy = false;
+                    if (error) {
+                        this.loginError = error.message === 'Invalid login credentials'
+                            ? 'That email and password do not match an account.'
+                            : error.message;
+                        return;
+                    }
+                    this.loginPassword = '';
+                    await this.afterSession(data.session);
+                },
+
+                async sendReset() {
+                    if (!sb) { this.loginError = 'No connection. Try again once you are back online.'; return; }
+                    const email = this.loginEmail.trim();
+                    if (!email) { this.loginError = 'Type your email address above first, then tap this again.'; return; }
+                    this.loginError = ''; this.loginNote = ''; this.busy = true;
+                    const { error } = await sb.auth.resetPasswordForEmail(email, {
+                        redirectTo: window.location.origin + window.location.pathname
+                    });
+                    this.busy = false;
+                    if (error) { this.loginError = error.message; return; }
+                    // Said the same way whether or not the address exists, so this
+                    // cannot be used to find out who has an account.
+                    this.loginNote = 'If that email has an account, a reset link is on its way. Check your inbox and spam folder.';
+                },
+
+                async setNewPassword() {
+                    if (this.newPassword !== this.newPassword2) {
+                        this.loginError = 'Those two passwords are not the same.'; return;
+                    }
+                    if (this.newPassword.length < 8) {
+                        this.loginError = 'Use at least 8 characters.'; return;
+                    }
+                    this.loginError = ''; this.busy = true;
+                    const { error } = await sb.auth.updateUser({ password: this.newPassword });
+                    this.busy = false;
+                    if (error) {
+                        this.loginError = error.message.includes('expired')
+                            ? 'That reset link has expired. Ask for a new one from the sign-in screen.'
+                            : error.message;
+                        return;
+                    }
+                    this.newPassword = ''; this.newPassword2 = '';
+                    history.replaceState(null, '', window.location.pathname);
+                    const { data } = await sb.auth.getSession();
+                    await this.afterSession(data.session);
+                    jbToast('Password changed. You are signed in.');
+                },
+
+                async signOut() {
+                    await sb.auth.signOut();
+                    this.profile = { full_name: '', role: 'cashier', is_active: false };
+                    this.stage = 'signin';
+                },
+
+                // ================= LOADING =================
+                async loadAll() {
+                    // A cashier reads the catalogue through a list that carries
+                    // no cost price, so those figures never reach their browser.
+                    const catalogue = this.userRole === 'admin' ? 'inventory' : 'inventory_for_sale';
+                    const lineSource = this.userRole === 'admin' ? 'sale_items' : 'sale_items_for_receipt';
+
+                    const [inv, sales, lines, rets, reps, custs, exps, setts] = await Promise.all([
+                        sb.from(catalogue).select('*').order('name'),
+                        sb.from('sales').select('*').order('sold_at', { ascending: false }).limit(2000),
+                        sb.from(lineSource).select('*').limit(10000),
+                        sb.from('returns_log').select('*').order('return_date', { ascending: false }).limit(2000),
+                        sb.from('repairs').select('*').order('created_at', { ascending: false }),
+                        sb.from('customers').select('*').order('name'),
+                        this.userRole === 'admin'
+                            ? sb.from('expenses').select('*').order('spent_on', { ascending: false })
+                            : Promise.resolve({ data: [], error: null }),
+                        sb.from('settings').select('*').maybeSingle()
+                    ]);
+
+                    const firstError = [inv, sales, lines, rets, reps, custs, exps, setts]
+                        .map(r => r && r.error).filter(Boolean)[0];
+                    if (firstError) {
+                        jbToast('Could not load everything: ' + firstError.message + '. Showing the last copy held on this device.');
+                        return;
+                    }
+
+                    this.inventory = (inv.data || []).map(toItem);
+                    const byId = {};
+                    this.sales = (sales.data || []).map(r => { const s = toSale(r); byId[s.id] = s; return s; });
+                    (lines.data || []).forEach(l => { if (byId[l.sale_id]) byId[l.sale_id].items.push(toSaleLine(l)); });
+                    this.returnsLog = (rets.data || []).map(toReturn);
+                    this.repairs = (reps.data || []);
+                    this.customers = (custs.data || []);
+                    this.expenses = (exps.data || []).map(toExpense);
+                    if (setts.data) {
+                        this.storeSettings = {
+                            storeName: setts.data.store_name, location: setts.data.location,
+                            currency: setts.data.currency, receiptFooter: setts.data.receipt_footer
+                        };
+                    }
+                    this.cacheAll();
+                },
+
+                cacheAll() {
+                    jbSet('jb_cache_inventory', this.inventory);
+                    jbSet('jb_cache_sales', this.sales);
+                    jbSet('jb_cache_returns', this.returnsLog);
+                    jbSet('jb_cache_repairs', this.repairs);
+                    jbSet('jb_cache_customers', this.customers);
+                    jbSet('jb_cache_expenses', this.expenses);
+                    jbSet('jb_cache_settings', this.storeSettings);
+                },
+
+                // Shared handling for a failed write.
+                oops(error, what) {
+                    jbToast('Could not ' + what + ': ' + (error.message || 'no connection'));
+                },
+
+                // ================= SETTINGS =================
+                async saveSettings() {
+                    const { error } = await sb.from('settings').update({
+                        store_name: this.storeSettings.storeName,
+                        location: this.storeSettings.location,
+                        currency: this.storeSettings.currency,
+                        receipt_footer: this.storeSettings.receiptFooter,
+                        updated_at: new Date().toISOString()
+                    }).eq('id', true);
+                    if (error) return this.oops(error, 'save the settings');
+                    this.cacheAll();
+                    jbToast('Settings saved for everyone.');
+                },
+
+                // ================= FIGURES =================
                 get filteredInventory() {
                     return this.inventory.filter(item => {
                         let matchesSearch = item.name.toLowerCase().includes(this.searchQuery.toLowerCase());
@@ -935,29 +1260,100 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
                     return this.netRevenue - totalCost - this.totalExpenses;
                 },
 
-                addItem() {
-                    this.inventory.push({ ...this.newItem });
+                // ================= STOCK =================
+                async addItem() {
+                    const { data, error } = await sb.from('inventory').insert({
+                        name: this.newItem.name,
+                        category: this.newItem.category,
+                        condition: this.newItem.condition,
+                        cost_price: parseFloat(this.newItem.costPrice || 0),
+                        selling_price: parseFloat(this.newItem.sellingPrice || 0),
+                        stock: parseInt(this.newItem.stock || 0, 10)
+                    }).select().single();
+                    if (error) return this.oops(error, 'add that product');
+                    this.inventory.push(toItem(data));
                     this.newItem = { name: '', category: 'Phones', condition: 'Brand New', costPrice: '', sellingPrice: '', stock: '' };
-                    this.saveData();
+                    this.cacheAll();
+                    jbToast('Product added.');
+                },
+
+                // Admins may correct a price or a stock count in place.
+                // Cashiers only ever see these as read-only text.
+                async updateItem(item) {
+                    const { error } = await sb.from('inventory').update({
+                        cost_price: parseFloat(item.costPrice || 0),
+                        selling_price: parseFloat(item.sellingPrice || 0),
+                        stock: parseInt(item.stock || 0, 10),
+                        updated_at: new Date().toISOString()
+                    }).eq('id', item.id);
+                    if (error) return this.oops(error, 'save that change');
+                    this.cacheAll();
+                },
+
+                async deleteItem(item) {
+                    const { error } = await sb.from('inventory').delete().eq('id', item.id);
+                    if (error) return this.oops(error, 'remove that product');
+                    const idx = this.inventory.indexOf(item);
+                    if (idx > -1) this.inventory.splice(idx, 1);
+                    this.cacheAll();
+                },
+
+                async importRows(rows, label) {
+                    if (!rows.length) { jbToast('Nothing to import.'); return; }
+                    const { data, error } = await sb.from('inventory').insert(rows).select();
+                    if (error) return this.oops(error, 'import the stock list');
+                    (data || []).forEach(r => this.inventory.push(toItem(r)));
+                    this.cacheAll();
+                    jbToast(`Imported ${data ? data.length : 0} items ${label}.`);
+                },
+
+                parseCSV(text) {
+                    const out = [];
+                    text.split('\n').forEach((line, i) => {
+                        line = line.trim();
+                        if (!line) return;
+                        const cols = line.split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+                        if (i === 0 && (cols[0].toLowerCase() === 'name' || cols[0].toLowerCase() === 'item')) return;
+                        if (cols.length < 6) return;
+                        const cost = parseFloat(cols[3]), sell = parseFloat(cols[4]), stock = parseInt(cols[5], 10);
+                        if (!cols[0] || isNaN(cost) || isNaN(sell) || isNaN(stock)) return;
+                        out.push({
+                            name: cols[0],
+                            category: ['Phones', 'Accessories', 'Consoles'].includes(cols[1]) ? cols[1] : 'Accessories',
+                            condition: ['Brand New', 'Pre-Owned'].includes(cols[2]) ? cols[2] : 'Brand New',
+                            cost_price: cost, selling_price: sell, stock: stock
+                        });
+                    });
+                    return out;
+                },
+
+                loadEmbeddedCSV() { return this.importRows(this.parseCSV(EMBEDDED_CSV_DATA), 'from the built-in list'); },
+
+                handleCSVUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        await this.importRows(this.parseCSV(e.target.result), 'from your file');
+                        event.target.value = '';
+                    };
+                    reader.readAsText(file);
                 },
 
                 csvTemplateText() {
-                    let template = "name,category,condition,costPrice,sellingPrice,stock\n";
-                    template += "iPhone 14 Pro 128GB,Phones,Pre-Owned,11000,14000,3\n";
-                    template += "Samsung S24 Ultra,Phones,Brand New,21000,25000,2\n";
-                    template += "PS5 Controller,Accessories,Brand New,1200,1600,10\n";
-                    return template;
+                    let t = "name,category,condition,costPrice,sellingPrice,stock\n";
+                    t += "iPhone 14 Pro 128GB,Phones,Pre-Owned,11000,14000,3\n";
+                    t += "Samsung S24 Ultra,Phones,Brand New,21000,25000,2\n";
+                    t += "PS5 Controller,Accessories,Brand New,1200,1600,10\n";
+                    return t;
                 },
 
                 downloadCSVTemplate() {
-                    let blob = new Blob([this.csvTemplateText()], { type: 'text/csv' });
-                    let url = URL.createObjectURL(blob);
-                    let a = document.createElement('a');
-                    a.href = url;
-                    a.download = "JB_Inventory_Import_Template.csv";
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
+                    const blob = new Blob([this.csvTemplateText()], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = 'JB_Inventory_Import_Template.csv';
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
                     setTimeout(() => URL.revokeObjectURL(url), 1000);
                 },
 
@@ -971,227 +1367,13 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
                     }
                 },
 
-                loadEmbeddedCSV() {
-                    let lines = EMBEDDED_CSV_DATA.split('\n');
-                    let count = 0;
-
-                    for (let i = 0; i < lines.length; i++) {
-                        let line = lines[i].trim();
-                        if (!line) continue;
-                        
-                        let cols = line.split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
-                        
-                        if (i === 0 && (cols[0].toLowerCase() === 'name' || cols[0].toLowerCase() === 'item')) {
-                            continue;
-                        }
-
-                        if (cols.length >= 6) {
-                            let name = cols[0];
-                            let category = cols[1];
-                            let condition = cols[2];
-                            let costPrice = parseFloat(cols[3]);
-                            let sellingPrice = parseFloat(cols[4]);
-                            let stock = parseInt(cols[5]);
-
-                            if (name && !isNaN(costPrice) && !isNaN(sellingPrice) && !isNaN(stock)) {
-                                let validCat = ['Phones', 'Accessories', 'Consoles'].includes(category) ? category : 'Accessories';
-                                let validCond = ['Brand New', 'Pre-Owned'].includes(condition) ? condition : 'Brand New';
-                                
-                                // Check if already exists to avoid exact duplicate spam, or push
-                                this.inventory.push({ name, category: validCat, condition: validCond, costPrice, sellingPrice, stock });
-                                count++;
-                            }
-                        }
-                    }
-
-                    this.saveData();
-                    jbToast(`Successfully loaded ${count} items from embedded CSV into inventory!`);
-                },
-
-                handleCSVUpload(event) {
-                    let file = event.target.files[0];
-                    if (!file) return;
-
-                    let reader = new FileReader();
-                    reader.onload = (e) => {
-                        let text = e.target.result;
-                        let lines = text.split('\n');
-                        let count = 0;
-
-                        for (let i = 0; i < lines.length; i++) {
-                            let line = lines[i].trim();
-                            if (!line) continue;
-                            
-                            let cols = line.split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
-                            
-                            if (i === 0 && (cols[0].toLowerCase() === 'name' || cols[0].toLowerCase() === 'item')) {
-                                continue;
-                            }
-
-                            if (cols.length >= 6) {
-                                let name = cols[0];
-                                let category = cols[1];
-                                let condition = cols[2];
-                                let costPrice = parseFloat(cols[3]);
-                                let sellingPrice = parseFloat(cols[4]);
-                                let stock = parseInt(cols[5]);
-
-                                if (name && !isNaN(costPrice) && !isNaN(sellingPrice) && !isNaN(stock)) {
-                                    let validCat = ['Phones', 'Accessories', 'Consoles'].includes(category) ? category : 'Accessories';
-                                    let validCond = ['Brand New', 'Pre-Owned'].includes(condition) ? condition : 'Brand New';
-                                    this.inventory.push({ name, category: validCat, condition: validCond, costPrice, sellingPrice, stock });
-                                    count++;
-                                }
-                            }
-                        }
-
-                        this.saveData();
-                        jbToast(`Successfully imported ${count} items into inventory!`);
-                        event.target.value = '';
-                    };
-                    reader.readAsText(file);
-                },
-
-                deleteItem(item) {
-                    let idx = this.inventory.indexOf(item);
-                    if (idx > -1) {
-                        this.inventory.splice(idx, 1);
-                        this.saveData();
-                    }
-                },
-
-                searchSaleForReturn() {
-                    let found = this.sales.find(s => String(s.id) === String(this.returnSearchId).trim());
-                    if (found) {
-                        this.selectedSaleForReturn = found;
-                    } else {
-                        jbToast('Sale ID not found!');
-                        this.selectedSaleForReturn = null;
-                    }
-                },
-
-                processReturn(sale) {
-                    if (sale.returned) return jbToast('This sale has already been returned.');
-                    this.pendingReturn = sale;
-                },
-
-                confirmReturn() {
-                    let sale = this.pendingReturn;
-                    if (!sale) return;
-                    this.pendingReturn = null;
-
-                    // Restock inventory
-                    sale.items.forEach(cartItem => {
-                        let invItem = this.inventory.find(i => i.name === cartItem.name && i.condition === cartItem.condition);
-                        if (invItem) {
-                            invItem.stock += cartItem.qty;
-                        } else {
-                            this.inventory.push({
-                                name: cartItem.name,
-                                category: cartItem.category || 'Phones',
-                                condition: cartItem.condition || 'Pre-Owned',
-                                costPrice: cartItem.costPrice || 0,
-                                sellingPrice: cartItem.sellingPrice,
-                                stock: cartItem.qty
-                            });
-                        }
-                    });
-
-                    sale.returned = true;
-                    this.returnsLog.push({
-                        id: Date.now(),
-                        saleId: sale.id,
-                        returnDate: new Date().toLocaleString(),
-                        reason: this.returnReason || 'Customer Return',
-                        refundTotal: sale.total
-                    });
-
-                    this.returnReason = '';
-                    this.selectedSaleForReturn = null;
-                    this.returnSearchId = '';
-                    this.saveData();
-                    jbToast('Sale return processed and items restocked successfully!');
-                },
-
-                askClearSales() {
-                    let units = this.sales.filter(s => !s.returned)
-                        .reduce((n, s) => n + (s.items || []).reduce((m, i) => m + i.qty, 0), 0);
-                    this.pendingWipe = { sales: this.sales.length, returns: this.returnsLog.length, units };
-                },
-
-                confirmClearSales() {
-                    // Put back the stock those sales took out. A sale already marked
-                    // returned had its stock restored at the time, so skip it.
-                    this.sales.filter(s => !s.returned).forEach(sale => {
-                        (sale.items || []).forEach(cartItem => {
-                            let invItem = this.inventory.find(i => i.name === cartItem.name && i.condition === cartItem.condition);
-                            if (invItem) invItem.stock += cartItem.qty;
-                        });
-                    });
-
-                    let soldCount = this.sales.length;
-                    let returnCount = this.returnsLog.length;
-                    this.sales = [];
-                    this.returnsLog = [];
-                    this.selectedSaleForReturn = null;
-                    this.returnSearchId = '';
-                    this.pendingWipe = null;
-                    this.saveData();
-                    jbToast(`Cleared ${soldCount} sale(s) and ${returnCount} return(s). Stock has been put back.`);
-                },
-
-                addRepair() {
-                    this.repairs.push({ ...this.newRepair, status: 'Pending' });
-                    this.newRepair = { customer: '', phone: '', device: '', issue: '', status: 'Pending' };
-                    this.saveData();
-                },
-
-                deleteRepair(index) {
-                    this.repairs.splice(index, 1);
-                    this.saveData();
-                },
-
-                addCustomer() {
-                    this.customers.push({ ...this.newCustomer });
-                    this.newCustomer = { name: '', phone: '' };
-                    this.saveData();
-                },
-
-                deleteCustomer(index) {
-                    this.customers.splice(index, 1);
-                    this.saveData();
-                },
-
-                getCustomerSpent(custName) {
-                    return this.sales
-                        .filter(s => s.customerName === custName && !s.returned)
-                        .reduce((sum, s) => sum + s.total, 0);
-                },
-
-                addExpense() {
-                    this.expenses.push({ 
-                        date: new Date().toLocaleDateString(), 
-                        ...this.newExpense 
-                    });
-                    this.newExpense = { description: '', amount: '' };
-                    this.saveData();
-                },
-
-                deleteExpense(index) {
-                    this.expenses.splice(index, 1);
-                    this.saveData();
-                },
-
-                waLink(repair) {
-                    let msg = `Hello ${repair.customer}, update regarding your ${repair.device} at ${this.storeSettings.storeName}. Status: *${repair.status}*. Thank you!`;
-                    return `https://wa.me/${String(repair.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`;
-                },
-
+                // ================= SELLING =================
                 addToCart(item) {
                     if (item.stock <= 0) return jbToast('Out of stock!');
-                    let existing = this.cart.find(c => c.name === item.name && c.condition === item.condition);
-                    if (existing) { existing.qty++; } 
-                    else { this.cart.push({ ...item, qty: 1 }); }
+                    const already = this.cart.filter(c => c.id === item.id).reduce((n, c) => n + c.qty, 0);
+                    if (already >= item.stock) return jbToast('That is all the stock on hand.');
+                    const existing = this.cart.find(c => c.id === item.id);
+                    if (existing) { existing.qty++; } else { this.cart.push({ ...item, qty: 1 }); }
                 },
 
                 removeFromCart(index) { this.cart.splice(index, 1); },
@@ -1202,46 +1384,225 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
 
                 get cartFinalTotal() {
                     let total = this.cartSubtotal;
-                    if (this.posSaleType === 'Swap') {
-                        total -= parseFloat(this.tradeInValue || 0);
-                    }
+                    if (this.posSaleType === 'Swap') total -= parseFloat(this.tradeInValue || 0);
                     total -= parseFloat(this.discountAmount || 0);
                     return Math.max(0, total);
                 },
 
-                checkout() {
-                    this.cart.forEach(cartItem => {
-                        let invItem = this.inventory.find(i => i.name === cartItem.name && i.condition === cartItem.condition);
-                        if (invItem) invItem.stock -= cartItem.qty;
-                    });
-                    
-                    let newSale = { 
-                        id: Math.floor(1000 + Math.random() * 9000),
-                        date: new Date().toLocaleString(), 
+                async checkout() {
+                    if (!this.cart.length) return;
+
+                    const args = {
+                        p_items: this.cart.map(c => ({ inventory_id: c.id, qty: c.qty })),
+                        p_customer_name: this.selectedCustomerName || null,
+                        p_sale_type: this.posSaleType,
+                        p_discount: parseFloat(this.discountAmount || 0),
+                        p_trade_in_device: this.posSaleType === 'Swap' ? this.tradeInDevice : null,
+                        p_trade_in_value: this.posSaleType === 'Swap' ? parseFloat(this.tradeInValue || 0) : 0,
+                        p_client_ref: uuid()
+                    };
+
+                    const receipt = {
+                        id: 'pending',
+                        date: new Date().toLocaleString(),
                         customerName: this.selectedCustomerName,
                         saleType: this.posSaleType,
-                        items: [...this.cart], 
+                        items: this.cart.map(c => ({ ...c })),
                         subtotal: this.cartSubtotal,
                         discount: parseFloat(this.discountAmount || 0),
-                        tradeInDevice: this.posSaleType === 'Swap' ? this.tradeInDevice : '',
-                        tradeInValue: this.posSaleType === 'Swap' ? parseFloat(this.tradeInValue || 0) : 0,
+                        tradeInDevice: args.p_trade_in_device || '',
+                        tradeInValue: args.p_trade_in_value,
                         total: this.cartFinalTotal,
                         returned: false
                     };
-                    
-                    this.sales.push(newSale);
-                    this.currentReceipt = newSale;
-                    this.cart = [];
-                    this.selectedCustomerName = '';
-                    this.discountAmount = 0;
-                    this.tradeInDevice = '';
-                    this.tradeInValue = 0;
-                    this.saveData();
-                    this.showReceipt = true;
+
+                    const finishLocally = () => {
+                        // take the stock off the on-screen figures either way
+                        this.cart.forEach(c => {
+                            const inv = this.inventory.find(i => i.id === c.id);
+                            if (inv) inv.stock -= c.qty;
+                        });
+                        this.currentReceipt = receipt;
+                        this.cart = [];
+                        this.selectedCustomerName = '';
+                        this.discountAmount = 0;
+                        this.tradeInDevice = '';
+                        this.tradeInValue = 0;
+                        this.showReceipt = true;
+                        this.cacheAll();
+                    };
+
+                    if (!this.online) {
+                        this.queueSale(args, receipt);
+                        receipt.id = 'offline';
+                        finishLocally();
+                        jbToast('No connection. Sale saved on this device and will be sent when you are back online.');
+                        return;
+                    }
+
+                    const { data, error } = await sb.rpc('record_sale', args);
+                    if (error) {
+                        // A refusal from the database (no stock, for instance) is
+                        // not a connection problem and must not be queued.
+                        if (error.message && /Only .* left of|no longer in the catalogue|Not allowed/.test(error.message)) {
+                            return this.oops(error, 'complete the sale');
+                        }
+                        this.queueSale(args, receipt);
+                        receipt.id = 'offline';
+                        finishLocally();
+                        jbToast('Could not reach the shop database. Sale saved here and will be sent shortly.');
+                        return;
+                    }
+
+                    receipt.id = data;
+                    finishLocally();
+                    this.loadAll();
+                },
+
+                queueSale(args, receipt) {
+                    this.queuedSales.push({ args, receipt, at: new Date().toISOString() });
+                    jbSet('jb_queued_sales', this.queuedSales);
+                },
+
+                // Sends anything held on the device. Each queued sale carries its
+                // own reference, so a sale that did reach the database on an
+                // earlier try is recognised and not banked a second time.
+                async flushQueue() {
+                    if (!this.queuedSales.length || !this.online || this.stage !== 'ready') return;
+                    const stuck = [];
+                    let sent = 0;
+                    for (const q of this.queuedSales) {
+                        const { error } = await sb.rpc('record_sale', q.args);
+                        if (error) { q.lastError = error.message; stuck.push(q); } else { sent++; }
+                    }
+                    this.queuedSales = stuck;
+                    jbSet('jb_queued_sales', this.queuedSales);
+                    if (sent) jbToast(`${sent} sale(s) made offline have now been sent.`);
+                    if (stuck.length) jbToast(`${stuck.length} offline sale(s) were refused: ${stuck[0].lastError}`);
+                    if (sent) await this.loadAll();
+                },
+
+                // ================= RETURNS =================
+                searchSaleForReturn() {
+                    const found = this.sales.find(s => String(s.id) === String(this.returnSearchId).trim());
+                    if (found) { this.selectedSaleForReturn = found; }
+                    else { jbToast('Sale ID not found!'); this.selectedSaleForReturn = null; }
+                },
+
+                processReturn(sale) {
+                    if (sale.returned) return jbToast('This sale has already been returned.');
+                    this.pendingReturn = sale;
+                },
+
+                async confirmReturn() {
+                    const sale = this.pendingReturn;
+                    if (!sale) return;
+                    this.pendingReturn = null;
+                    const { error } = await sb.rpc('process_return', {
+                        p_sale_id: sale.id,
+                        p_reason: this.returnReason || 'Customer Return'
+                    });
+                    if (error) return this.oops(error, 'process that return');
+                    this.returnReason = '';
+                    this.selectedSaleForReturn = null;
+                    this.returnSearchId = '';
+                    await this.loadAll();
+                    jbToast('Return processed and the items are back in stock.');
+                },
+
+                askClearSales() {
+                    const units = this.sales.filter(s => !s.returned)
+                        .reduce((n, s) => n + (s.items || []).reduce((m, i) => m + i.qty, 0), 0);
+                    this.pendingWipe = { sales: this.sales.length, returns: this.returnsLog.length, units };
+                },
+
+                async confirmClearSales() {
+                    this.pendingWipe = null;
+                    const { data, error } = await sb.rpc('clear_sales_history');
+                    if (error) return this.oops(error, 'clear the sales history');
+                    await this.loadAll();
+                    jbToast(`Cleared ${data.sales} sale(s) and ${data.returns} return(s). ${data.units_restored} item(s) went back into stock.`);
+                },
+
+                // ================= REPAIRS =================
+                async addRepair() {
+                    const { data, error } = await sb.from('repairs')
+                        .insert({ ...this.newRepair, status: 'Pending' }).select().single();
+                    if (error) return this.oops(error, 'create that repair ticket');
+                    this.repairs.unshift(data);
+                    this.newRepair = { customer: '', phone: '', device: '', issue: '', status: 'Pending' };
+                    this.cacheAll();
+                },
+
+                async updateRepair(repair) {
+                    const { error } = await sb.from('repairs')
+                        .update({ status: repair.status, updated_at: new Date().toISOString() })
+                        .eq('id', repair.id);
+                    if (error) return this.oops(error, 'update that repair');
+                    this.cacheAll();
+                    jbToast('Repair updated to ' + repair.status + '.');
+                },
+
+                async deleteRepair(repair) {
+                    const { error } = await sb.from('repairs').delete().eq('id', repair.id);
+                    if (error) return this.oops(error, 'delete that repair');
+                    const idx = this.repairs.indexOf(repair);
+                    if (idx > -1) this.repairs.splice(idx, 1);
+                    this.cacheAll();
+                },
+
+                // ================= CUSTOMERS =================
+                async addCustomer() {
+                    const { data, error } = await sb.from('customers')
+                        .insert({ ...this.newCustomer }).select().single();
+                    if (error) return this.oops(error, 'save that customer');
+                    this.customers.push(data);
+                    this.newCustomer = { name: '', phone: '' };
+                    this.cacheAll();
+                },
+
+                async deleteCustomer(customer) {
+                    const { error } = await sb.from('customers').delete().eq('id', customer.id);
+                    if (error) return this.oops(error, 'delete that customer');
+                    const idx = this.customers.indexOf(customer);
+                    if (idx > -1) this.customers.splice(idx, 1);
+                    this.cacheAll();
+                },
+
+                getCustomerSpent(custName) {
+                    return this.sales
+                        .filter(s => s.customerName === custName && !s.returned)
+                        .reduce((sum, s) => sum + s.total, 0);
+                },
+
+                // ================= EXPENSES =================
+                async addExpense() {
+                    const { data, error } = await sb.from('expenses').insert({
+                        description: this.newExpense.description,
+                        amount: parseFloat(this.newExpense.amount || 0)
+                    }).select().single();
+                    if (error) return this.oops(error, 'record that expense');
+                    this.expenses.unshift(toExpense(data));
+                    this.newExpense = { description: '', amount: '' };
+                    this.cacheAll();
+                },
+
+                async deleteExpense(expense) {
+                    const { error } = await sb.from('expenses').delete().eq('id', expense.id);
+                    if (error) return this.oops(error, 'delete that expense');
+                    const idx = this.expenses.indexOf(expense);
+                    if (idx > -1) this.expenses.splice(idx, 1);
+                    this.cacheAll();
+                },
+
+                // ================= RECEIPT =================
+                waLink(repair) {
+                    const msg = `Hello ${repair.customer}, update regarding your ${repair.device} at ${this.storeSettings.storeName}. Status: *${repair.status}*. Thank you!`;
+                    return `https://wa.me/${String(repair.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`;
                 },
 
                 receiptText() {
-                    let r = this.currentReceipt;
+                    const r = this.currentReceipt;
                     let text = `================================\n`;
                     text += `          ${this.storeSettings.storeName.toUpperCase()}            \n`;
                     text += `        ${this.storeSettings.location}          \n`;
@@ -1255,29 +1616,25 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
                         text += `${item.name} (${item.condition}) (x${item.qty}) - ${this.storeSettings.currency} ${(item.sellingPrice * item.qty).toFixed(2)}\n`;
                     });
                     text += `--------------------------------\n`;
-                    if (r.tradeInDevice) text += `Trade-In: ${r.tradeInDevice} (-${this.storeSettings.currency} ${r.tradeInValue.toFixed(2)})\n`;
-                    if (r.discount > 0) text += `Discount: -${this.storeSettings.currency} ${r.discount.toFixed(2)}\n`;
-                    text += `FINAL PAID: ${this.storeSettings.currency} ${r.total.toFixed(2)}\n`;
+                    if (r.tradeInDevice) text += `Trade-In: ${r.tradeInDevice} (-${this.storeSettings.currency} ${Number(r.tradeInValue).toFixed(2)})\n`;
+                    if (r.discount > 0) text += `Discount: -${this.storeSettings.currency} ${Number(r.discount).toFixed(2)}\n`;
+                    text += `FINAL PAID: ${this.storeSettings.currency} ${Number(r.total).toFixed(2)}\n`;
                     text += `================================\n`;
                     text += `  ${this.storeSettings.receiptFooter}  \n`;
-
                     return text;
                 },
 
                 downloadReceipt() {
-                    let blob = new Blob([this.receiptText()], { type: 'text/plain' });
-                    let url = URL.createObjectURL(blob);
-                    let a = document.createElement('a');
-                    a.href = url;
-                    a.download = `Receipt_${this.currentReceipt.id}.txt`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
+                    const blob = new Blob([this.receiptText()], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = `Receipt_${this.currentReceipt.id}.txt`;
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
                     setTimeout(() => URL.revokeObjectURL(url), 1000);
                 },
 
                 copyReceipt() {
-                    let text = this.receiptText();
+                    const text = this.receiptText();
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         navigator.clipboard.writeText(text)
                             .then(() => jbToast('Receipt copied — paste it into WhatsApp, SMS or a note.'))
