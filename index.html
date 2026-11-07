@@ -19,6 +19,9 @@
         [x-cloak] { display: none !important; }
         html, body { height: 100%; }
         body { background: #f1f5f9; color: #1e293b; color-scheme: light; margin: 0; }
+        /* The sign-in and app screens measure against this wrapper, so it
+           has to be full height too or they stop part way down the page. */
+        .jb-root { height: 100%; }
         .jb-screen { height: 100%; }
         /* keep the fixed phone nav clear of the on-screen home bar */
         .jb-bottomnav {
@@ -48,7 +51,7 @@
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans">
 
-    <div x-data="storeApp()" x-cloak>
+    <div class="jb-root" x-data="storeApp()" x-cloak>
 
     <!-- ============ SIGN IN ============ -->
     <div x-show="stage === 'loading'" class="jb-screen flex items-center justify-center bg-slate-100">
