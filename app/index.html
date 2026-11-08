@@ -1074,11 +1074,19 @@
                                                 <span x-show="!m.staffId" class="text-slate-500" x-text="m.email"></span>
                                             </td>
                                             <td class="p-4">
-                                                <select :value="m.role" @change="setStaffRole(m, $event.target.value)" :disabled="m.isMe"
-                                                        class="border rounded px-2 py-1 text-xs bg-white disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer">
-                                                    <option value="cashier">Cashier</option>
-                                                    <option value="admin">Admin</option>
-                                                </select>
+                                                <template x-if="m.role === 'owner' || m.isMe">
+                                                    <span class="px-2 py-0.5 rounded text-xs font-semibold border"
+                                                          :class="m.role === 'owner' ? 'bg-slate-900 text-white border-slate-900'
+                                                                                     : 'bg-slate-100 text-slate-600 border-slate-200'"
+                                                          x-text="m.role === 'owner' ? 'Owner' : (m.role === 'admin' ? 'Admin' : 'Cashier')"></span>
+                                                </template>
+                                                <template x-if="m.role !== 'owner' && !m.isMe">
+                                                    <select :value="m.role" @change="setStaffRole(m, $event.target.value)"
+                                                            class="border rounded px-2 py-1 text-xs bg-white cursor-pointer">
+                                                        <option value="cashier">Cashier</option>
+                                                        <option value="admin">Admin</option>
+                                                    </select>
+                                                </template>
                                             </td>
                                             <td class="p-4">
                                                 <span class="px-2 py-0.5 rounded text-xs font-medium border"
@@ -1089,6 +1097,7 @@
                                                 <button @click="openPassword(m)" class="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 cursor-pointer">Set password</button>
                                                 <button x-show="!m.isMe && m.isActive" @click="setStaffActive(m, false)" class="text-rose-600 hover:text-rose-800 text-xs font-medium px-2 py-1 cursor-pointer">Switch off</button>
                                                 <button x-show="!m.isMe && !m.isActive" @click="setStaffActive(m, true)" class="text-emerald-600 hover:text-emerald-800 text-xs font-medium px-2 py-1 cursor-pointer">Switch on</button>
+                                                <button x-show="!m.isMe && m.role !== 'owner'" @click="removeStaff(m)" class="text-rose-700 hover:text-rose-900 text-xs font-bold px-2 py-1 cursor-pointer">Remove</button>
                                             </td>
                                         </tr>
                                     </template>
@@ -2095,6 +2104,39 @@
                     this.loadStaff();
                 },
 
+                // Switching off stops someone signing in; this removes the
+                // login for good. Their sales stay on the books, just without
+                // a name against them.
+                async removeStaff(member) {
+                    if (!confirm('Remove ' + member.fullName + ' for good?\n\n'
+                        + 'Their login stops working and cannot be brought back. Sales, repairs and '
+                        + 'plans they handled stay on the books, but will no longer show their name.\n\n'
+                        + 'To stop them signing in without losing the account, use Switch off instead.')) return;
+
+                    this.staffBusy = true;
+                    try {
+                        const { data: sess } = await sb.auth.getSession();
+                        const token = sess && sess.session ? sess.session.access_token : null;
+                        if (!token) return jbToast('Your session has expired. Sign in again.');
+
+                        const res = await fetch(SUPABASE_URL + '/functions/v1/manage-staff', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json',
+                                       'Authorization': 'Bearer ' + token,
+                                       'apikey': SUPABASE_KEY },
+                            body: JSON.stringify({ action: 'delete', user_id: member.id })
+                        });
+                        const body = await res.json().catch(() => ({}));
+                        if (!res.ok) return jbToast(body.error || 'Could not remove the account.');
+                        jbToast(member.fullName + ' has been removed.');
+                        this.loadStaff();
+                    } catch (e) {
+                        jbToast('Could not reach the staff service. It may not be set up on the server yet.');
+                    } finally {
+                        this.staffBusy = false;
+                    }
+                },
+
                 openPassword(member) { this.pwFor = member; this.pwNew = ''; },
                 closePassword() { this.pwFor = null; this.pwNew = ''; },
 
@@ -2110,12 +2152,12 @@
                         const token = sess && sess.session ? sess.session.access_token : null;
                         if (!token) return jbToast('Your session has expired. Sign in again.');
 
-                        const res = await fetch(SUPABASE_URL + '/functions/v1/set-staff-password', {
+                        const res = await fetch(SUPABASE_URL + '/functions/v1/manage-staff', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json',
                                        'Authorization': 'Bearer ' + token,
                                        'apikey': SUPABASE_KEY },
-                            body: JSON.stringify({ user_id: this.pwFor.id, password: this.pwNew })
+                            body: JSON.stringify({ action: 'set_password', user_id: this.pwFor.id, password: this.pwNew })
                         });
                         const body = await res.json().catch(() => ({}));
                         if (!res.ok) {

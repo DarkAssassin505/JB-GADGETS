@@ -1,17 +1,23 @@
 // =====================================================================
-// set-staff-password
+// manage-staff
 // =====================================================================
-// A cashier has no email address, so there is nowhere to send a reset
-// link. This lets the owner or an admin set a new password directly.
+// Two jobs that both need the service role key, which must never sit in
+// the app where a customer could read it:
 //
-// Changing somebody else's password needs the service role key, which
-// must never sit in the app where a customer could read it. So it lives
-// here instead, on the server, behind these checks:
+//   set_password - a cashier has no email address, so there is nowhere
+//                  to send a reset link. The owner or an admin sets a
+//                  new one directly.
+//
+//   delete       - removes the login for good. The database decides
+//                  whether it is allowed and notes who left; this only
+//                  carries out the deletion afterwards.
+//
+// The checks, in both cases:
 //
 //   - the caller must be signed in, active, and an owner or an admin
-//   - an admin may set a password for a cashier or another admin
-//   - only the owner may set the owner's password, and the owner's
-//     account is invisible to an admin in the first place
+//   - an admin may act on a cashier or another admin
+//   - the owner's account is never touched by an admin, and is never
+//     deleted by anyone
 //
 // That last rule is the important one. Without it an admin could set a
 // new password on the owner's account and then sign in as the owner.
@@ -60,19 +66,19 @@ Deno.serve(async (req) => {
     return reply({ error: 'Only the owner or an admin can set a password.' }, 403);
   }
 
-  let body: { user_id?: string; password?: string };
+  let body: { action?: string; user_id?: string; password?: string };
   try {
     body = await req.json();
   } catch {
     return reply({ error: 'Could not read the request.' }, 400);
   }
 
+  const action   = (body.action ?? 'set_password').trim();
   const targetId = (body.user_id ?? '').trim();
-  const password = body.password ?? '';
 
   if (!targetId) return reply({ error: 'Which account?' }, 400);
-  if (password.length < 8) {
-    return reply({ error: 'A password needs at least 8 characters.' }, 400);
+  if (targetId === who.user.id && action === 'delete') {
+    return reply({ error: 'You cannot remove your own account.' }, 400);
   }
 
   const { data: target } = await admin
@@ -80,9 +86,32 @@ Deno.serve(async (req) => {
 
   if (!target) return reply({ error: 'That account does not exist.' }, 404);
 
-  // An admin cannot touch the owner, by any route.
+  // An admin cannot touch the owner, by any route. The same answer a
+  // made-up id would get, so nothing is confirmed by asking.
   if (target.role === 'owner' && caller.role !== 'owner') {
     return reply({ error: 'That account does not exist.' }, 404);
+  }
+
+  if (action === 'delete') {
+    // The database applies the rules and records who left. If it
+    // refuses, nothing is deleted.
+    const { data: prep, error: prepErr } = await asCaller
+      .rpc('admin_prepare_staff_deletion', { p_user_id: targetId });
+    if (prepErr) return reply({ error: prepErr.message }, 403);
+
+    const { error: delErr } = await admin.auth.admin.deleteUser(targetId);
+    if (delErr) return reply({ error: delErr.message }, 400);
+
+    return reply({ ok: true, deleted: true, full_name: target.full_name, prepared: prep });
+  }
+
+  if (action !== 'set_password') {
+    return reply({ error: 'Unknown action.' }, 400);
+  }
+
+  const password = body.password ?? '';
+  if (password.length < 8) {
+    return reply({ error: 'A password needs at least 8 characters.' }, 400);
   }
 
   const { error: setErr } = await admin.auth.admin.updateUserById(targetId, { password });
