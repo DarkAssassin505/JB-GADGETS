@@ -392,8 +392,12 @@
                 <span class="font-bold text-zinc-900 font-inter">K10,000</span>
               </div>
               <div class="flex justify-between text-xs text-blue-700 mt-1 pt-1 border-t border-blue-200/60 font-semibold">
-                <span>Weekly Payment <span class="text-zinc-400 font-normal">(8 weeks)</span>:</span>
+                <span>Weekly Payment <span class="text-zinc-400 font-normal">(12 weeks)</span>:</span>
                 <span class="font-extrabold text-blue-800 font-inter">K1,250 / week</span>
+              </div>
+              <div class="flex justify-between text-[11px] text-zinc-600 mt-1 pt-1 border-t border-blue-200/60">
+                <span>Total on the plan:</span>
+                <span class="font-bold text-zinc-900 font-inter">K25,000 <span class="font-normal text-zinc-500">(cash K20,000)</span></span>
               </div>
             </div>
           </div>
@@ -441,8 +445,12 @@
                 <span class="font-bold text-zinc-900 font-inter">K8,250</span>
               </div>
               <div class="flex justify-between text-xs text-blue-700 mt-1 pt-1 border-t border-blue-200/60 font-semibold">
-                <span>Weekly Payment <span class="text-zinc-400 font-normal">(8 weeks)</span>:</span>
+                <span>Weekly Payment <span class="text-zinc-400 font-normal">(12 weeks)</span>:</span>
                 <span class="font-extrabold text-blue-800 font-inter">K1,031 / week</span>
+              </div>
+              <div class="flex justify-between text-[11px] text-zinc-600 mt-1 pt-1 border-t border-blue-200/60">
+                <span>Total on the plan:</span>
+                <span class="font-bold text-zinc-900 font-inter">K20,622 <span class="font-normal text-zinc-500">(cash K16,500)</span></span>
               </div>
             </div>
           </div>
@@ -490,8 +498,12 @@
                 <span class="font-bold text-zinc-900 font-inter">K5,200</span>
               </div>
               <div class="flex justify-between text-xs text-blue-700 mt-1 pt-1 border-t border-blue-200/60 font-semibold">
-                <span>Weekly Payment <span class="text-zinc-400 font-normal">(8 weeks)</span>:</span>
+                <span>Weekly Payment <span class="text-zinc-400 font-normal">(12 weeks)</span>:</span>
                 <span class="font-extrabold text-blue-800 font-inter">K963 / week</span>
+              </div>
+              <div class="flex justify-between text-[11px] text-zinc-600 mt-1 pt-1 border-t border-blue-200/60">
+                <span>Total on the plan:</span>
+                <span class="font-bold text-zinc-900 font-inter">K16,756 <span class="font-normal text-zinc-500">(cash K13,000)</span></span>
               </div>
             </div>
           </div>
@@ -639,9 +651,9 @@
       <div>
         <h4 class="font-bold text-sm text-white mb-3">Hire Purchase Guidelines</h4>
         <ul class="space-y-2 text-zinc-400 text-xs">
-          <li>• First payment of 30% to 50%, shown on every phone</li>
-          <li>• Balance cleared over 8 weekly payments</li>
-          <li>• No extra charge for paying weekly — the plan totals the cash price, and the last payment is adjusted to settle the balance exactly</li>
+          <li>• First payment from 30%, shown on every phone</li>
+          <li>• Balance cleared over 12 weekly payments</li>
+          <li>• Paying weekly costs more than paying cash. The total on the plan is shown on every phone and in the price list, so you can compare before you commit</li>
           <li>• Testing warranty & official store receipt provided</li>
           <li>• Valid NRC or passport, plus bank statements or mobile money statements for the last three months, required for hire purchase registration</li>
         </ul>
@@ -713,7 +725,8 @@
                 <th class="py-2.5 px-3">Storage</th>
                 <th class="py-2.5 px-3">Cash Price</th>
                 <th class="py-2.5 px-3">First Payment</th>
-                <th class="py-2.5 px-3">Weekly Payment<span class="block font-normal normal-case text-[10px] text-zinc-400">over 8 weeks</span></th>
+                <th class="py-2.5 px-3">Weekly Payment<span class="block font-normal normal-case text-[10px] text-zinc-400">x 12 weeks</span></th>
+                <th class="py-2.5 px-3">Total on Plan</th>
                 <th class="py-2.5 px-3 text-right">Action</th>
               </tr>
             </thead>
@@ -887,8 +900,12 @@
                   <span class="font-bold text-zinc-900 font-inter">K${fmtK(p.first)}</span>
                 </div>
                 <div class="flex justify-between text-blue-700 font-semibold pt-1 mt-1 border-t border-blue-200/60">
-                  <span>Weekly <span class="text-zinc-400 font-normal">(x8)</span>:</span>
+                  <span>Weekly <span class="text-zinc-400 font-normal">(x12)</span>:</span>
                   <span class="font-extrabold text-blue-900 font-inter">K${fmtK(p.weekly)}/wk</span>
+                </div>
+                <div class="flex justify-between text-[10px] text-zinc-500 mt-1 pt-1 border-t border-zinc-200">
+                  <span>Total on the plan:</span>
+                  <span class="font-bold text-zinc-700 font-inter">K${fmtK(p.first + 12 * p.weekly)}</span>
                 </div>
               </div>
             </div>
@@ -1046,7 +1063,7 @@
 
       let message = "Hello JB Gadget Stores Lusaka! I would like to order/inquire about the following units:\n\n";
       cart.forEach((item, index) => {
-        message += `${index + 1}. ${item.name} (${item.storage})\n   - Cash: K${fmtK(item.cash)}\n   - First Payment: K${fmtK(item.first)}\n   - Weekly: K${fmtK(item.weekly)}/week for 8 weeks\n\n`;
+        message += `${index + 1}. ${item.name} (${item.storage})\n   - Cash: K${fmtK(item.cash)}\n   - First Payment: K${fmtK(item.first)}\n   - Weekly: K${fmtK(item.weekly)}/week for 12 weeks\n   - Total on plan: K${fmtK(item.first + 12 * item.weekly)}\n\n`;
       });
 
       const total = cart.reduce((sum, item) => sum + item.cash, 0);
@@ -1094,6 +1111,7 @@
           <td class="py-2.5 px-3 font-bold text-zinc-900">K${fmtK(p.cash)}</td>
           <td class="py-2.5 px-3 font-semibold text-zinc-700">K${fmtK(p.first)}</td>
           <td class="py-2.5 px-3 font-bold text-blue-700">K${fmtK(p.weekly)}/wk</td>
+          <td class="py-2.5 px-3 font-bold text-zinc-900">K${fmtK(p.first + 12 * p.weekly)}</td>
           <td class="py-2.5 px-3 text-right">
             <a href="https://wa.me/260964485293?text=Hi%20JB%20Gadgets,%20I%20am%20reserving%20the%20${encodeURIComponent(p.name)}%20(${encodeURIComponent(p.storage)})%20plan%20-%20Cash:%20K${p.cash},%20First:%20K${p.first},%20Weekly:%20K${p.weekly}" target="_blank" class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1 rounded font-semibold text-[11px]">
               <i class="fa-brands fa-whatsapp"></i> Reserve
