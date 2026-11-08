@@ -25,6 +25,20 @@
       background-color: #ffffff;
     }
     .font-inter { font-family: 'Inter', sans-serif; }
+    #heroStage {
+      --hero-a: #000000;
+      --hero-b: #0d1322;
+      --hero-accent: #60a5fa;
+      background-image: linear-gradient(100deg, var(--hero-a) 0%, var(--hero-b) 50%, var(--hero-a) 100%);
+      transition: --hero-a 900ms ease, --hero-b 900ms ease, --hero-accent 900ms ease, background-color 900ms ease;
+    }
+    /* Browsers that can animate custom properties fade between the two
+       palettes; the rest simply switch, which still reads as a change. */
+    @property --hero-a { syntax: '<color>'; initial-value: #000000; inherits: true; }
+    @property --hero-b { syntax: '<color>'; initial-value: #0d1322; inherits: true; }
+    @property --hero-accent { syntax: '<color>'; initial-value: #60a5fa; inherits: true; }
+    @media (prefers-reduced-motion: reduce) { #heroStage { transition: none; } }
+
     .hero-slide {
       transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     }
@@ -177,21 +191,21 @@
   <!-- ========================================================================= -->
   <!-- 4. HERO BANNER SLIDER (Matches Cosmic Coming Soon & Accessories from Video) -->
   <!-- ========================================================================= -->
-  <section class="relative bg-zinc-950 overflow-hidden text-white">
+  <section id="heroStage" class="relative overflow-hidden text-white">
     <div class="max-w-[1340px] mx-auto relative min-h-[380px] sm:min-h-[480px] flex items-center">
       
-      <!-- SLIDE 1: COMING SOON / HIRE PURCHASE AVAILABLE -->
-      <div class="hero-slide absolute inset-0 px-6 sm:px-14 flex items-center justify-between opacity-100 z-10 transition-all duration-700 bg-gradient-to-r from-black via-[#0d1322] to-black" data-slide="0">
+      <!-- SLIDE 1: IN STOCK TODAY / WEEKLY HIRE PURCHASE -->
+      <div class="hero-slide absolute inset-0 px-6 sm:px-14 flex items-center justify-between opacity-100 z-10 transition-all duration-700" data-slide="0">
         <div class="max-w-xl py-8 space-y-3 z-10">
-          <div class="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-400/30 text-blue-400 text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+          <div class="inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider border" style="color: var(--hero-accent); border-color: color-mix(in srgb, var(--hero-accent) 45%, transparent); background: color-mix(in srgb, var(--hero-accent) 12%, transparent)">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-            Weekly Hire Purchase Active
+            In stock today
           </div>
           <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight leading-none text-white font-sans uppercase">
-            COMING SOON
+            Walk in. Pay weekly.<br>Walk out with it.
           </h1>
           <p class="text-base sm:text-lg text-zinc-300 font-light pt-1">
-            Be the first in Lusaka to secure genuine UK iPhones with flexible weekly layby payment plans!
+            28 genuine UK iPhones on the shelf in Lusaka CBD, from the XS to the 16 Pro Max. First payment from 30%, the balance over 12 weeks.
           </p>
           <div class="pt-4 flex items-center gap-3 flex-wrap">
             <a href="#store-inventory" class="bg-white hover:bg-zinc-200 text-black font-semibold text-xs px-6 py-3 rounded-md transition-colors shadow">
@@ -251,14 +265,14 @@
       </div>
 
       <!-- SLIDE 2: ACCESSORIES THAT MOVE WITH YOU (From 00:04 in video) -->
-      <div class="hero-slide absolute inset-0 px-6 sm:px-14 flex items-center justify-between opacity-0 z-0 transition-all duration-700 bg-gradient-to-r from-[#0d1626] via-[#101c33] to-[#0a0f1d] pointer-events-none" data-slide="1">
+      <div class="hero-slide absolute inset-0 px-6 sm:px-14 flex items-center justify-between opacity-0 z-0 transition-all duration-700 pointer-events-none" data-slide="1">
         <div class="max-w-xl py-8 space-y-3 z-10 pointer-events-auto">
-          <div class="text-xs uppercase tracking-widest text-amber-400 font-bold">POWER UP YOUR EVERYDAY</div>
+          <div class="text-xs uppercase tracking-widest font-bold" style="color: var(--hero-accent)">Power up your everyday</div>
           <h2 class="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight text-white font-sans uppercase">
-            ACCESSORIES THAT MOVE WITH YOU
+            Everything else<br>your phone needs
           </h2>
           <p class="text-xs sm:text-sm text-zinc-300 font-normal pt-1 max-w-md">
-            Chargers, earbuds, original Apple PD adapters, and 3.6A fast car chargers in stock along Chiparamba Road.
+            Chargers, earbuds, original Apple PD adapters and 3.6A fast car chargers, on the shelf at Chiparamba Road.
           </p>
           <div class="pt-5 flex items-center gap-3">
             <a href="#store-inventory" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-6 py-3 rounded-md transition-colors">
@@ -1122,8 +1136,23 @@
     }
 
     // Hero Carousel
+    // One palette per slide, so the whole banner changes colour as it turns.
+    const HERO_PALETTES = [
+      { a: '#04070f', b: '#0d2340', accent: '#60a5fa' },   // phones: deep blue
+      { a: '#120a04', b: '#3a2208', accent: '#fbbf24' }    // accessories: warm amber
+    ];
+
     function setSlide(idx) {
       currentSlide = idx;
+
+      const stage = document.getElementById('heroStage');
+      const pal = HERO_PALETTES[idx] || HERO_PALETTES[0];
+      if (stage) {
+        stage.style.setProperty('--hero-a', pal.a);
+        stage.style.setProperty('--hero-b', pal.b);
+        stage.style.setProperty('--hero-accent', pal.accent);
+      }
+
       const slides = document.querySelectorAll('.hero-slide');
       const dots = document.querySelectorAll('.hero-dot');
 
