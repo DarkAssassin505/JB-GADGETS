@@ -110,7 +110,10 @@ create unique index if not exists hp_payments_client_ref_key
 -- what should have been paid by today against what has been, so a
 -- customer who pays ahead shows no arrears.
 
-create or replace view public.hp_book as
+-- Dropped rather than replaced: a later migration adds a column in the
+-- middle of this list, and a replace cannot reshape a view.
+drop view if exists public.hp_book;
+create view public.hp_book as
 select x.*,
        greatest(x.expected_to_date - x.paid_to_date, 0) as arrears
 from (

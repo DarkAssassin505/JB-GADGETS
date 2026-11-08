@@ -298,7 +298,10 @@
                                                 </template>
                                             </td>
                                             <td class="p-3 text-right text-slate-500 text-xs" x-text="sale.discount > 0 ? ('-' + storeSettings.currency + ' ' + sale.discount.toFixed(2)) : '-'"></td>
-                                            <td class="p-3 text-right text-emerald-600 font-bold" x-text="storeSettings.currency + ' ' + sale.total.toFixed(2)"></td>
+                                            <td class="p-3 text-right text-emerald-600 font-bold">
+                                                <span x-show="sale.isTest" class="mr-1 text-[9px] font-bold bg-slate-900 text-white px-1.5 py-0.5 rounded align-middle">TEST</span>
+                                                <span x-text="storeSettings.currency + ' ' + sale.total.toFixed(2)"></span>
+                                            </td>
                                             <td class="p-3 text-center">
                                                 <span :class="sale.returned ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'" class="px-2 py-0.5 rounded text-[11px] font-medium" x-text="sale.returned ? 'Returned' : 'Completed'"></span>
                                             </td>
@@ -615,8 +618,16 @@
                             <button @click="checkout" :disabled="cart.length === 0 || (posSaleType === 'Hire Purchase' && (!hpName.trim() || cartCashOnlyNames.length > 0))"
                                     :class="posSaleType === 'Hire Purchase' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-emerald-600 hover:bg-emerald-700'"
                                     class="w-full disabled:bg-slate-300 text-white font-medium py-2.5 rounded-lg transition text-sm flex items-center justify-center space-x-2 cursor-pointer mt-2">
-                                <span x-text="posSaleType === 'Hire Purchase' ? 'Take Deposit & Open Plan' : 'Complete Transaction'"></span>
+                                <span x-text="posSaleType === 'Hire Purchase' ? 'Review Plan' : 'Review Sale'"></span>
                             </button>
+                            <p class="text-[10px] text-slate-400 text-center -mt-1">You will see the receipt before anything is saved.</p>
+
+                            <!-- Only the owner can ring one of these, and the
+                                 database refuses it from anybody else. -->
+                            <label x-show="isOwner" class="flex items-center justify-center space-x-2 text-[11px] text-slate-600 cursor-pointer pt-1 border-t">
+                                <input type="checkbox" x-model="isTestSale" class="rounded">
+                                <span>Test transaction &mdash; no stock moves, nobody else sees it</span>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -1201,12 +1212,35 @@
                         </div>
                     </template>
 
-                    <div class="bg-white p-6 rounded-xl shadow-sm border border-rose-200 max-w-2xl space-y-3">
-                        <h3 class="text-lg font-bold text-slate-800 border-b pb-3">Clear Test Data</h3>
+                    <template x-if="isOwner">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border-2 border-slate-900 max-w-2xl space-y-3">
+                        <div class="flex items-center justify-between border-b pb-3">
+                            <h3 class="text-lg font-bold text-slate-800">Test Transactions</h3>
+                            <span class="text-[10px] font-bold bg-slate-900 text-white px-2 py-1 rounded">OWNER ONLY</span>
+                        </div>
                         <p class="text-sm text-slate-600">
-                            Deletes every sale and every sales return saved on this device, for when the records so far were
-                            only practice runs. Stock sold on those sales is added back, so your quantities are correct again.
-                            Products, customers, repairs and expenses are left untouched.
+                            Sales you ticked as a test. They never moved stock and nobody else can see them, so removing
+                            them changes nothing in the real books.
+                        </p>
+                        <p class="text-xs text-slate-500">
+                            There are <span class="font-bold" x-text="sales.filter(s => s.isTest).length"></span> test transaction(s).
+                        </p>
+                        <button @click="clearTestTransactions()" class="bg-slate-900 hover:bg-black text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer">
+                            Remove test transactions
+                        </button>
+                    </div>
+                    </template>
+
+                    <template x-if="isOwner">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-rose-200 max-w-2xl space-y-3">
+                        <div class="flex items-center justify-between border-b pb-3">
+                            <h3 class="text-lg font-bold text-slate-800">Clear All Sales History</h3>
+                            <span class="text-[10px] font-bold bg-slate-900 text-white px-2 py-1 rounded">OWNER ONLY</span>
+                        </div>
+                        <p class="text-sm text-slate-600">
+                            Deletes every sale, sales return and hire purchase plan in the shop, for everyone, for when the
+                            records so far were only practice runs. Stock sold on real sales is added back, so your
+                            quantities are correct again. Products, customers, repairs and expenses are left untouched.
                         </p>
                         <p class="text-xs text-slate-500">
                             This device currently holds
@@ -1218,6 +1252,7 @@
                             Clear Sales &amp; Returns
                         </button>
                     </div>
+                    </template>
                 </div>
 
             </div>
@@ -1230,7 +1265,11 @@
                     <img x-show="receiptDesign.showLogo" src="../logo-mark.png" alt="" class="h-10 w-auto mx-auto mb-1">
                     <h3 class="text-base font-bold text-slate-900 tracking-wider" x-text="receiptDesign.headerLine">JB GADGETS STORE</h3>
                     <p class="text-[10px] text-slate-500" x-show="receiptDesign.subheader" x-text="receiptDesign.subheader"></p>
-                    <p class="text-[10px] text-slate-700 font-bold mt-1" x-text="'RECEIPT #' + currentReceipt.id"></p>
+                    <p x-show="!receiptIsPreview" class="text-[10px] text-slate-700 font-bold mt-1" x-text="'RECEIPT #' + currentReceipt.id"></p>
+                    <p x-show="receiptIsPreview" class="text-[10px] font-bold mt-1 bg-amber-100 text-amber-900 border border-amber-300 rounded px-2 py-1">
+                        PREVIEW &mdash; NOT SAVED YET<br><span class="font-normal">A receipt number is given once you confirm.</span>
+                    </p>
+                    <p x-show="currentReceipt.isTest" class="text-[10px] font-bold mt-1 bg-slate-900 text-white rounded px-2 py-0.5">TEST TRANSACTION</p>
                     <p class="text-[10px] text-slate-400" x-text="currentReceipt.date"></p>
                     <p class="text-[10px] text-slate-400" x-show="receiptDesign.showCashier && profile.full_name" x-text="'Served by ' + profile.full_name"></p>
                     <p class="text-[10px] text-slate-400" x-show="receiptDesign.showCustomer && currentReceipt.customerName" x-text="currentReceipt.customerName"></p>
@@ -1281,12 +1320,26 @@
                 </div>
 
                 <div class="flex flex-col space-y-2 pt-2 print:hidden">
-                    <div class="flex space-x-2">
-                        <button @click="window.print()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-xs cursor-pointer">Print</button>
-                        <button @click="downloadReceipt()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-xs cursor-pointer">Download</button>
-                        <button @click="copyReceipt()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-xs cursor-pointer">Copy</button>
-                    </div>
-                    <button @click="showReceipt = false" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-xs cursor-pointer">Done</button>
+                    <template x-if="receiptIsPreview">
+                        <div class="space-y-2">
+                            <p class="text-[10px] text-slate-500 text-center">Check the items, the prices and the customer. Nothing has been saved.</p>
+                            <div class="flex space-x-2">
+                                <button @click="cancelPreview()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded text-xs cursor-pointer">Cancel &amp; fix</button>
+                                <button @click="confirmSale()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded text-xs cursor-pointer"
+                                        x-text="posSaleType === 'Hire Purchase' ? 'Confirm & open plan' : 'Confirm sale'"></button>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="!receiptIsPreview">
+                        <div class="space-y-2">
+                            <div class="flex space-x-2">
+                                <button @click="window.print()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-xs cursor-pointer">Print</button>
+                                <button @click="downloadReceipt()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-xs cursor-pointer">Download</button>
+                                <button @click="copyReceipt()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded text-xs cursor-pointer">Copy</button>
+                            </div>
+                            <button @click="showReceipt = false" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-xs cursor-pointer">Done</button>
+                        </div>
+                    </template>
                 </div>
             </div>
         </div>
@@ -1435,6 +1488,7 @@
             tradeInDevice: r.trade_in_device || '',
             tradeInValue: Number(r.trade_in_value),
             total: Number(r.total),
+            isTest: !!r.is_test,
             returned: r.returned,
             items: []
         });
@@ -1485,6 +1539,8 @@
                 currentReceipt: { id: '', date: '', customerName: '', items: [], total: 0, discount: 0, tradeInDevice: '', tradeInValue: 0 },
                 selectedCustomerName: '',
                 posSaleType: 'Cash',
+                receiptIsPreview: false,     // the slip is a preview, nothing saved yet
+                isTestSale: false,           // owner only
 
                 // ---- staff ----
                 staff: [],
@@ -1757,6 +1813,16 @@
                     jbToast('Settings saved for everyone.');
                 },
 
+                async clearTestTransactions() {
+                    const n = this.sales.filter(s => s.isTest).length;
+                    if (!n) return jbToast('There are no test transactions to remove.');
+                    if (!confirm('Remove ' + n + ' test transaction(s)? Real sales are not touched.')) return;
+                    const { data, error } = await sb.rpc('clear_test_transactions');
+                    if (error) return this.oops(error, 'clear the test transactions');
+                    jbToast('Removed ' + (data ? data.test_sales_removed : n) + ' test transaction(s).');
+                    this.loadAll();
+                },
+
                 async saveReceiptDesign() {
                     const d = this.receiptDesign;
                     const { error } = await sb.from('receipt_design').update({
@@ -1799,8 +1865,12 @@
                     return this.hpBook.reduce((t, a) => t + (a.paidToDate - a.deposit), 0);
                 },
 
+                // Test transactions never count towards money, not even for
+                // the owner who made them. They exist to be looked at.
+                get realSales() { return this.sales.filter(s => !s.isTest); },
+
                 get netRevenue() {
-                    let totalSales = this.sales.filter(s => !s.returned).reduce((sum, sale) => sum + sale.total, 0);
+                    let totalSales = this.realSales.filter(s => !s.returned).reduce((sum, sale) => sum + sale.total, 0);
                     let totalRefunds = this.returnsLog.reduce((sum, r) => sum + r.refundTotal, 0);
                     return totalSales + this.hpCollections - totalRefunds;
                 },
@@ -1810,7 +1880,7 @@
                 },
 
                 get netProfit() {
-                    let validSales = this.sales.filter(s => !s.returned);
+                    let validSales = this.realSales.filter(s => !s.returned);
                     let totalCost = validSales.reduce((sum, sale) => {
                         let saleCost = sale.items.reduce((cSum, item) => cSum + ((item.costPrice || 0) * item.qty), 0);
                         return sum + saleCost;
@@ -2067,7 +2137,7 @@
                 // Opening a plan needs the customer on record, so unlike a cash
                 // sale it is not queued when the line is down - there is a
                 // signed agreement behind it and it must be banked for real.
-                async checkoutHirePurchase() {
+                async commitHirePurchase() {
                     const missing = this.cartCashOnlyNames;
                     if (missing.length) {
                         return jbToast('No weekly plan set for ' + missing.join(', ') + '.');
@@ -2087,7 +2157,8 @@
                         p_deposit: deposit,
                         p_weekly: weekly,
                         p_weeks: 12,
-                        p_client_ref: uuid()
+                        p_client_ref: uuid(),
+                        p_is_test: this.isTestSale
                     });
                     if (error) return this.oops(error, 'open the hire purchase');
 
@@ -2101,17 +2172,21 @@
                         discount: 0,
                         tradeInDevice: '', tradeInValue: 0,
                         total: deposit,
+                        isTest: this.isTestSale,
                         hirePurchase: { deposit: deposit, weekly: weekly, weeks: 12,
                                         totalPayable: deposit + weekly * 12 },
                         returned: false
                     };
-                    this.cart.forEach(c => {
-                        const inv = this.inventory.find(i => i.id === c.id);
-                        if (inv) inv.stock -= c.qty;
-                    });
+                    if (!this.isTestSale) {
+                        this.cart.forEach(c => {
+                            const inv = this.inventory.find(i => i.id === c.id);
+                            if (inv) inv.stock -= c.qty;
+                        });
+                    }
                     this.cart = [];
                     this.hpName = ''; this.hpPhone = ''; this.hpNrc = '';
                     this.posSaleType = 'Cash';
+                    this.isTestSale = false;
                     this.showReceipt = true;
                     this.cacheAll();
                     this.loadAll();
@@ -2229,9 +2304,73 @@
                     return Math.max(0, total);
                 },
 
-                async checkout() {
+                // Nothing is saved on this step. The slip that appears is the
+                // slip that will print, so a mistake is caught before it is on
+                // the books rather than having to be returned afterwards.
+                checkout() {
                     if (!this.cart.length) return;
-                    if (this.posSaleType === 'Hire Purchase') return this.checkoutHirePurchase();
+
+                    const discount = parseFloat(this.discountAmount || 0);
+                    const cap = Number(this.ownerSettings.maxDiscountPercent);
+                    if (discount > 0 && this.cartSubtotal > 0 && isFinite(cap)) {
+                        const asPercent = (discount / this.cartSubtotal) * 100;
+                        if (asPercent > cap + 0.0001) {
+                            return jbToast('That discount is ' + asPercent.toFixed(1) +
+                                '% of the sale. The most allowed is ' + cap + '%.');
+                        }
+                    }
+
+                    if (this.posSaleType === 'Hire Purchase') {
+                        if (this.cartCashOnlyNames.length) {
+                            return jbToast('No weekly plan set for ' + this.cartCashOnlyNames.join(', ') + '.');
+                        }
+                        if (!this.hpName.trim()) return jbToast('A plan needs the customer\'s name.');
+                        if (this.ownerSettings.requireNrcForHp && !this.hpNrc.trim()) {
+                            return jbToast('A plan needs the customer\'s NRC or passport.');
+                        }
+                    }
+
+                    this.currentReceipt = this.buildPreview();
+                    this.receiptIsPreview = true;
+                    this.showReceipt = true;
+                },
+
+                buildPreview() {
+                    const hp = this.posSaleType === 'Hire Purchase';
+                    const deposit = this.hpDeposit, weekly = this.hpWeekly;
+                    return {
+                        id: null,
+                        date: new Date().toLocaleString(),
+                        customerName: hp ? this.hpName.trim() : this.selectedCustomerName,
+                        saleType: this.posSaleType,
+                        items: this.cart.map(c => ({ ...c })),
+                        subtotal: this.cartSubtotal,
+                        discount: hp ? 0 : parseFloat(this.discountAmount || 0),
+                        tradeInDevice: hp ? '' : this.tradeInDevice,
+                        tradeInValue: hp ? 0 : parseFloat(this.tradeInValue || 0),
+                        total: hp ? deposit : this.cartFinalTotal,
+                        isTest: this.isTestSale,
+                        hirePurchase: hp ? { deposit: deposit, weekly: weekly, weeks: 12,
+                                             totalPayable: deposit + weekly * 12 } : null,
+                        returned: false
+                    };
+                },
+
+                cancelPreview() {
+                    this.showReceipt = false;
+                    this.receiptIsPreview = false;
+                    jbToast('Nothing was saved. Fix the order and ring it up again.');
+                },
+
+                async confirmSale() {
+                    this.receiptIsPreview = false;
+                    this.showReceipt = false;
+                    if (this.posSaleType === 'Hire Purchase') return this.commitHirePurchase();
+                    return this.commitSale();
+                },
+
+                async commitSale() {
+                    if (!this.cart.length) return;
 
                     const args = {
                         p_items: this.cart.map(c => ({ inventory_id: c.id, qty: c.qty })),
@@ -2240,7 +2379,8 @@
                         p_discount: parseFloat(this.discountAmount || 0),
                         p_trade_in_device: this.posSaleType === 'Swap' ? this.tradeInDevice : null,
                         p_trade_in_value: this.posSaleType === 'Swap' ? parseFloat(this.tradeInValue || 0) : 0,
-                        p_client_ref: uuid()
+                        p_client_ref: uuid(),
+                        p_is_test: this.isTestSale
                     };
 
                     const receipt = {
@@ -2254,15 +2394,19 @@
                         tradeInDevice: args.p_trade_in_device || '',
                         tradeInValue: args.p_trade_in_value,
                         total: this.cartFinalTotal,
+                        isTest: this.isTestSale,
                         returned: false
                     };
+                    const wasTest = this.isTestSale;
 
                     const finishLocally = () => {
-                        // take the stock off the on-screen figures either way
-                        this.cart.forEach(c => {
-                            const inv = this.inventory.find(i => i.id === c.id);
-                            if (inv) inv.stock -= c.qty;
-                        });
+                        // A test sale takes no stock, here or in the database.
+                        if (!wasTest) {
+                            this.cart.forEach(c => {
+                                const inv = this.inventory.find(i => i.id === c.id);
+                                if (inv) inv.stock -= c.qty;
+                            });
+                        }
                         this.currentReceipt = receipt;
                         this.cart = [];
                         this.selectedCustomerName = '';
