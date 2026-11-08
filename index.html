@@ -39,6 +39,30 @@
     @property --hero-accent { syntax: '<color>'; initial-value: #60a5fa; inherits: true; }
     @media (prefers-reduced-motion: reduce) { #heroStage { transition: none; } }
 
+    /* A trolley rolling across the foot of the banner, in whatever colour
+       the current slide is using. */
+    .hero-cart {
+      position: absolute;
+      bottom: 10px;
+      left: 0;
+      width: 112px;
+      z-index: 5;
+      pointer-events: none;
+      opacity: .5;
+      color: var(--hero-accent);
+      animation: hero-cart-roll 14s linear infinite;
+    }
+    .hero-cart .wheel { animation: hero-wheel-spin 1.1s linear infinite; transform-origin: center; transform-box: fill-box; }
+    @keyframes hero-cart-roll {
+      0%   { transform: translateX(-140px); }
+      100% { transform: translateX(calc(100vw + 140px)); }
+    }
+    @keyframes hero-wheel-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-cart { animation: none; transform: translateX(24px); opacity: .3; }
+      .hero-cart .wheel { animation: none; }
+    }
+
     .hero-slide {
       transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     }
@@ -162,7 +186,7 @@
       <!-- Nav items -->
       <div class="flex items-center gap-1 sm:gap-6 py-2.5 overflow-x-auto no-scrollbar">
         <button onclick="filterCatalog('all')" class="category-nav-btn active py-1 px-2.5 text-blue-600 font-bold border-b-2 border-blue-600 whitespace-nowrap" data-cat="all">
-          All Phones (28 Models)
+          All Phones
         </button>
         <button onclick="filterCatalog('preowned')" class="category-nav-btn py-1 px-2.5 hover:text-blue-600 text-zinc-700 whitespace-nowrap" data-cat="preowned">
           Pre-Owned UK Stock (20)
@@ -194,6 +218,26 @@
   <section id="heroStage" class="relative overflow-hidden text-white">
     <div class="max-w-[1340px] mx-auto relative min-h-[380px] sm:min-h-[480px] flex items-center">
       
+      <!-- Rolling trolley, behind the text -->
+      <svg class="hero-cart" viewBox="0 0 120 72" fill="none" aria-hidden="true" focusable="false">
+        <!-- basket -->
+        <path d="M26 16 H102 L92 44 H38 Z" stroke="currentColor" stroke-width="5"
+              stroke-linejoin="round" stroke-linecap="round"/>
+        <!-- basket bars -->
+        <path d="M44 16 L48 44 M62 16 L63 44 M80 16 L78 44 M31 27 H98 M35 36 H94"
+              stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".75"/>
+        <!-- handle -->
+        <path d="M4 6 H16 L26 16" stroke="currentColor" stroke-width="5"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- axle down to the wheels -->
+        <path d="M38 44 L42 56 M92 44 L86 56" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+        <circle class="wheel" cx="44" cy="62" r="8" stroke="currentColor" stroke-width="4"/>
+        <circle class="wheel" cx="84" cy="62" r="8" stroke="currentColor" stroke-width="4"/>
+        <!-- spokes, so the spin is visible -->
+        <path class="wheel" d="M44 55 V69 M37 62 H51" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity=".8"/>
+        <path class="wheel" d="M84 55 V69 M77 62 H91" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity=".8"/>
+      </svg>
+
       <!-- SLIDE 1: IN STOCK TODAY / WEEKLY HIRE PURCHASE -->
       <div class="hero-slide absolute inset-0 px-6 sm:px-14 flex items-center justify-between opacity-100 z-10 transition-all duration-700" data-slide="0">
         <div class="max-w-xl py-8 space-y-3 z-10">
@@ -205,7 +249,7 @@
             Walk in. Pay weekly.<br>Walk out with it.
           </h1>
           <p class="text-base sm:text-lg text-zinc-300 font-light pt-1">
-            28 genuine UK iPhones on the shelf in Lusaka CBD, from the XS to the 16 Pro Max. First payment from 30%, the balance over 12 weeks.
+            Genuine UK iPhones on the shelf in Lusaka CBD, from the XS to the 16 Pro Max. First payment from 30%, the balance over 12 weeks.
           </p>
           <div class="pt-4 flex items-center gap-3 flex-wrap">
             <a href="#store-inventory" class="bg-white hover:bg-zinc-200 text-black font-semibold text-xs px-6 py-3 rounded-md transition-colors shadow">
@@ -367,7 +411,7 @@
           <h2 class="text-2xl font-bold text-zinc-900 mt-1">Lusaka Top Demand Flagships</h2>
         </div>
         <button onclick="openHirePurchaseModal()" class="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">
-          Full Rate Sheet (28 models) <i class="fa-solid fa-arrow-right text-[10px]"></i>
+          Full Rate Sheet <i class="fa-solid fa-arrow-right text-[10px]"></i>
         </button>
       </div>
 
@@ -537,7 +581,7 @@
   </section>
 
   <!-- ========================================================================= -->
-  <!-- 7. MAIN COMPLETE CATALOG (All 28 Models from Price Sheet) -->
+  <!-- 7. MAIN COMPLETE CATALOG (from the price sheet) -->
   <!-- ========================================================================= -->
   <section class="py-10 bg-white border-b border-zinc-200" id="store-inventory">
     <div class="max-w-[1340px] mx-auto px-4 sm:px-8">
@@ -1136,17 +1180,35 @@
     }
 
     // Hero Carousel
-    // One palette per slide, so the whole banner changes colour as it turns.
+    // A spread of palettes, picked at random each time the banner turns.
+    // All are dark enough to keep white text readable.
     const HERO_PALETTES = [
-      { a: '#04070f', b: '#0d2340', accent: '#60a5fa' },   // phones: deep blue
-      { a: '#120a04', b: '#3a2208', accent: '#fbbf24' }    // accessories: warm amber
+      { a: '#04070f', b: '#0d2340', accent: '#60a5fa' },  // deep blue
+      { a: '#120a04', b: '#3a2208', accent: '#fbbf24' },  // warm amber
+      { a: '#04100c', b: '#0b3a2a', accent: '#34d399' },  // emerald
+      { a: '#10040e', b: '#3b0d33', accent: '#f0abfc' },  // orchid
+      { a: '#0b0412', b: '#2a1052', accent: '#a78bfa' },  // violet
+      { a: '#120406', b: '#431119', accent: '#fb7185' },  // rose
+      { a: '#040f12', b: '#0b3540', accent: '#22d3ee' },  // teal
+      { a: '#0f0a03', b: '#45301a', accent: '#fdba74' },  // copper
+      { a: '#08040f', b: '#1e1b4b', accent: '#818cf8' },  // indigo
+      { a: '#0a1004', b: '#2c3d0b', accent: '#a3e635' }   // lime
     ];
+
+    let lastPalette = -1;
+    function pickPalette() {
+      if (HERO_PALETTES.length < 2) return 0;
+      let i = lastPalette;
+      while (i === lastPalette) i = Math.floor(Math.random() * HERO_PALETTES.length);
+      lastPalette = i;
+      return i;
+    }
 
     function setSlide(idx) {
       currentSlide = idx;
 
       const stage = document.getElementById('heroStage');
-      const pal = HERO_PALETTES[idx] || HERO_PALETTES[0];
+      const pal = HERO_PALETTES[pickPalette()];
       if (stage) {
         stage.style.setProperty('--hero-a', pal.a);
         stage.style.setProperty('--hero-b', pal.b);
