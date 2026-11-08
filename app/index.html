@@ -204,7 +204,7 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                     <span>Staff</span>
                 </button>
-                <button x-show="userRole === 'admin'" @click="currentTab = 'audit'; loadAudit()" :class="currentTab === 'audit' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                <button x-show="isOwner" @click="currentTab = 'audit'; loadAudit()" :class="currentTab === 'audit' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     <span>Activity Log</span>
                 </button>
@@ -1148,7 +1148,8 @@
                             <p class="text-xs text-slate-500">
                                 Price changes, stock moved by hand, plans written off, staff added or removed, settings edited.
                                 Selling is not listed here &mdash; that is the sales records. Written by the database itself, so
-                                nobody can change or delete an entry, including you.
+                                nobody can change or delete an entry, including you. Only you can read it; the shop asks you
+                                for it when they want it.
                             </p>
                             <div class="flex items-center gap-2 text-xs font-medium flex-wrap pt-1">
                                 <template x-for="f in [['all','Everything'],['inventory','Stock &amp; prices'],['staff','Staff'],['hire purchase','Plans'],['settings','Settings'],['sales','Sales history']]" :key="f[0]">
@@ -2004,7 +2005,8 @@
                             lowStockThreshold: Number(o.low_stock_threshold)
                         };
                     }
-                    if (this.userRole === 'admin') { this.loadStaff(); this.loadAudit(); this.loadShopKeyState(); }
+                    if (this.userRole === 'admin') { this.loadStaff(); this.loadShopKeyState(); }
+                    if (this.isOwner) this.loadAudit();
                     if (setts.data) {
                         this.storeSettings = {
                             storeName: setts.data.store_name, location: setts.data.location,
@@ -2406,7 +2408,7 @@
                 },
 
                 async loadAudit() {
-                    if (this.userRole !== 'admin') { this.auditLog = []; return; }
+                    if (!this.isOwner) { this.auditLog = []; return; }
                     const { data, error } = await sb.from('audit_log')
                         .select('*').order('id', { ascending: false }).limit(400);
                     if (error) { this.auditLog = []; return; }
