@@ -1,35 +1,35 @@
-name,category,condition,costPrice,sellingPrice,stock
-iPhone 11 128GB,Phones,Pre-Owned,0,4000,0
-iPhone 11 Pro 256GB,Phones,Pre-Owned,0,5000,0
-iPhone 11 Pro Max 256GB,Phones,Pre-Owned,0,5500,0
-iPhone 12 128GB,Phones,Pre-Owned,0,5500,0
-iPhone 12 Pro 128GB,Phones,Pre-Owned,0,6000,0
-iPhone 12 Pro Max 256GB,Phones,Pre-Owned,0,7000,0
-iPhone 13 256GB,Phones,Pre-Owned,0,7000,0
-iPhone 13 Pro 256GB,Phones,Pre-Owned,0,8500,0
-iPhone 13 Pro Max 256GB,Phones,Pre-Owned,0,9500,0
-iPhone 14 128GB,Phones,Pre-Owned,0,8500,0
-iPhone 14 Plus 128GB,Phones,Pre-Owned,0,9500,0
-iPhone 14 Pro 128GB,Phones,Pre-Owned,0,10500,0
-iPhone 14 Pro Max 128GB,Phones,Pre-Owned,0,11500,0
-iPhone 15 128GB,Phones,Pre-Owned,0,11000,0
-iPhone 15 Plus 128GB,Phones,Pre-Owned,0,12000,0
-iPhone 15 Pro 128GB,Phones,Pre-Owned,0,12500,0
-iPhone 15 Pro Max 256GB,Phones,Pre-Owned,0,14500,0
-iPhone 16 128GB,Phones,Pre-Owned,0,14500,0
-iPhone 16 Plus 128GB,Phones,Pre-Owned,0,15500,0
-iPhone 16 Pro 128GB,Phones,Pre-Owned,0,16500,0
-iPhone 16 Pro Max 256GB,Phones,Pre-Owned,0,19000,0
-iPhone 11 128GB,Phones,Brand New,0,5200,0
-iPhone 11 Pro 256GB,Phones,Brand New,0,6200,0
-iPhone 11 Pro Max 256GB,Phones,Brand New,0,6700,0
-iPhone 12 128GB,Phones,Brand New,0,6500,0
-iPhone 12 Pro 128GB,Phones,Brand New,0,7200,0
-iPhone 12 Pro Max 256GB,Phones,Brand New,0,8800,0
-iPhone 13 256GB,Phones,Brand New,0,8500,0
-iPhone 13 Pro Max 256GB,Phones,Brand New,0,12000,0
-iPhone 15 Pro 256GB,Phones,Brand New,0,14000,0
-iPhone 15 Plus 256GB,Phones,Brand New,0,13000,0
-iPhone 15 Pro Max 256GB (OCC),Phones,Brand New,0,16500,0
-iPhone 17 Pro 256GB (Active),Phones,Brand New,0,26000,0
-iPhone 17 Pro Max 256GB (Active),Phones,Brand New,0,29000,0
+name,category,condition,costPrice,sellingPrice,stock,firstPayment,weeklyPayment
+iPhone 11 128GB,Phones,Pre-Owned,0,4000,0,2000,250
+iPhone 11 Pro 256GB,Phones,Pre-Owned,0,5000,0,2500,312
+iPhone 11 Pro Max 256GB,Phones,Pre-Owned,0,5500,0,2750,343
+iPhone 12 128GB,Phones,Pre-Owned,0,5500,0,2200,412
+iPhone 12 Pro 128GB,Phones,Pre-Owned,0,6000,0,2400,450
+iPhone 12 Pro Max 256GB,Phones,Pre-Owned,0,7000,0,2800,525
+iPhone 13 256GB,Phones,Pre-Owned,0,7000,0,2800,525
+iPhone 13 Pro 256GB,Phones,Pre-Owned,0,8500,0,3400,637
+iPhone 13 Pro Max 256GB,Phones,Pre-Owned,0,9500,0,3800,712
+iPhone 14 128GB,Phones,Pre-Owned,0,8500,0,3400,637
+iPhone 14 Plus 128GB,Phones,Pre-Owned,0,9500,0,3800,712
+iPhone 14 Pro 128GB,Phones,Pre-Owned,0,10500,0,4200,787
+iPhone 14 Pro Max 128GB,Phones,Pre-Owned,0,11500,0,4600,862
+iPhone 15 128GB,Phones,Pre-Owned,0,11000,0,4400,825
+iPhone 15 Plus 128GB,Phones,Pre-Owned,0,12000,0,4800,900
+iPhone 15 Pro 128GB,Phones,Pre-Owned,0,12500,0,5000,937
+iPhone 15 Pro Max 256GB,Phones,Pre-Owned,0,14500,0,5800,1087
+iPhone 16 128GB,Phones,Pre-Owned,0,14500,0,5800,1087
+iPhone 16 Plus 128GB,Phones,Pre-Owned,0,15500,0,7750,968
+iPhone 16 Pro 128GB,Phones,Pre-Owned,0,16500,0,8250,1031
+iPhone 16 Pro Max 256GB,Phones,Pre-Owned,0,19000,0,9500,1187
+iPhone 11 128GB,Phones,Brand New,0,5200,0,2600,300
+iPhone 11 Pro 256GB,Phones,Brand New,0,6200,0,3100,387
+iPhone 11 Pro Max 256GB,Phones,Brand New,0,6700,0,3350,418
+iPhone 12 128GB,Phones,Brand New,0,6500,0,2600,487
+iPhone 12 Pro 128GB,Phones,Brand New,0,7200,0,2880,540
+iPhone 12 Pro Max 256GB,Phones,Brand New,0,8800,0,3520,660
+iPhone 13 256GB,Phones,Brand New,0,8500,0,3400,637
+iPhone 13 Pro Max 256GB,Phones,Brand New,0,12000,0,6000,750
+iPhone 15 Pro 256GB,Phones,Brand New,0,14000,0,7000,875
+iPhone 15 Plus 256GB,Phones,Brand New,0,13000,0,6500,812
+iPhone 15 Pro Max 256GB (OCC),Phones,Brand New,0,16500,0,8250,1031
+iPhone 17 Pro 256GB (Active),Phones,Brand New,0,26000,0,16900,1137
+iPhone 17 Pro Max 256GB (Active),Phones,Brand New,0,29000,0,18850,1268
