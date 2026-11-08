@@ -180,6 +180,7 @@
                     <span>Point of Sale</span>
                 </button>
                 <button @click="currentTab = 'hirepurchase'" :class="currentTab === 'hirepurchase' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                     <span>Hire Purchase</span>
                     <span x-show="hpBehindCount > 0" class="ml-auto bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full" x-text="hpBehindCount"></span>
                 </button>
@@ -200,9 +201,11 @@
                     <span>Expenses</span>
                 </button>
                 <button x-show="userRole === 'admin'" @click="currentTab = 'staff'; loadStaff()" :class="currentTab === 'staff' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                     <span>Staff</span>
                 </button>
                 <button x-show="userRole === 'admin'" @click="currentTab = 'audit'; loadAudit()" :class="currentTab === 'audit' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     <span>Activity Log</span>
                 </button>
                 <button x-show="userRole === 'admin'" @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
@@ -1218,6 +1221,58 @@
                         </form>
                     </div>
 
+                    <!-- The shop's own lock. Not shown to the owner, who cannot set it. -->
+                    <template x-if="!isOwner">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border-2 border-amber-300 max-w-2xl space-y-3">
+                            <div class="flex items-center justify-between border-b pb-3">
+                                <h3 class="text-lg font-bold text-slate-800">Shop Key</h3>
+                                <span class="text-[10px] font-bold px-2 py-1 rounded"
+                                      :class="shopKeyIsSet ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white'"
+                                      x-text="shopKeyIsSet ? 'SET' : 'NOT SET YET'"></span>
+                            </div>
+                            <p class="text-sm text-slate-600">
+                                Your stock, prices and costs are yours to change freely. The platform owner cannot touch
+                                them without this key, and has to ask you for it each time. Set one and keep it to
+                                yourself.
+                            </p>
+                            <form @submit.prevent="saveShopKey" class="space-y-3">
+                                <div x-show="shopKeyIsSet">
+                                    <label class="block text-xs font-semibold text-slate-600 mb-1">Current key</label>
+                                    <input type="password" x-model="oldShopKey" autocomplete="off" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 mb-1" x-text="shopKeyIsSet ? 'New key' : 'Choose a key'"></label>
+                                    <input type="text" x-model="newShopKey" minlength="8" placeholder="At least 8 characters" autocomplete="off" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500">
+                                </div>
+                                <button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer"
+                                        x-text="shopKeyIsSet ? 'Change the key' : 'Set the key'"></button>
+                                <p class="text-[11px] text-slate-400">
+                                    Only the scrambled form is stored, so nobody can read it back &mdash; not even from the
+                                    database. If you forget it, set a new one from here.
+                                </p>
+                            </form>
+                        </div>
+                    </template>
+
+                    <!-- The owner types the key Joseph gave him. -->
+                    <template x-if="isOwner">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border-2 border-amber-300 max-w-2xl space-y-3">
+                            <div class="flex items-center justify-between border-b pb-3">
+                                <h3 class="text-lg font-bold text-slate-800">Shop Key</h3>
+                                <span class="text-[10px] font-bold bg-amber-500 text-white px-2 py-1 rounded">ASK THE SHOP</span>
+                            </div>
+                            <p class="text-sm text-slate-600">
+                                The shop's stock, prices and costs are locked to you. To change anything, ask the shop
+                                admin for the key and type it here. It is held for this session only and is never saved.
+                            </p>
+                            <input type="password" x-model="shopKey" placeholder="Shop key" autocomplete="off" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500">
+                            <p class="text-[11px] text-slate-500">
+                                Any change you make with it is recorded in the shop's activity log as having been made
+                                with the key.
+                            </p>
+                        </div>
+                    </template>
+
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl space-y-3">
                         <h3 class="text-lg font-bold text-slate-800 border-b pb-3">Take a copy of your records</h3>
                         <p class="text-sm text-slate-600">
@@ -1667,6 +1722,12 @@
                 receiptIsPreview: false,     // the slip is a preview, nothing saved yet
                 isTestSale: false,           // owner only
 
+                // ---- the shop key ----
+                // Joseph's stock is locked to the owner without it.
+                shopKey: '',                 // typed by the owner, never stored
+                shopKeyIsSet: false,
+                newShopKey: '', oldShopKey: '',
+
                 // ---- the audit log ----
                 auditLog: [],
                 auditFilter: 'all',
@@ -1907,7 +1968,7 @@
                             lowStockThreshold: Number(o.low_stock_threshold)
                         };
                     }
-                    if (this.userRole === 'admin') { this.loadStaff(); this.loadAudit(); }
+                    if (this.userRole === 'admin') { this.loadStaff(); this.loadAudit(); this.loadShopKeyState(); }
                     if (setts.data) {
                         this.storeSettings = {
                             storeName: setts.data.store_name, location: setts.data.location,
@@ -2097,7 +2158,8 @@
                         p_selling: parseFloat(this.newItem.sellingPrice || 0),
                         p_stock: parseInt(this.newItem.stock || 0, 10),
                         p_first:  this.newItem.firstPayment  === '' ? null : parseFloat(this.newItem.firstPayment),
-                        p_weekly: this.newItem.weeklyPayment === '' ? null : parseFloat(this.newItem.weeklyPayment)
+                        p_weekly: this.newItem.weeklyPayment === '' ? null : parseFloat(this.newItem.weeklyPayment),
+                        p_shop_key: this.shopKey || null
                     });
                     if (error) return this.oops(error, 'add that product');
                     if (data) this.inventory.push(toItem(data));
@@ -2118,14 +2180,15 @@
                         p_selling: parseFloat(item.sellingPrice || 0),
                         p_stock: parseInt(item.stock || 0, 10),
                         p_first:  item.firstPayment  == null || item.firstPayment  === '' ? null : parseFloat(item.firstPayment),
-                        p_weekly: item.weeklyPayment == null || item.weeklyPayment === '' ? null : parseFloat(item.weeklyPayment)
+                        p_weekly: item.weeklyPayment == null || item.weeklyPayment === '' ? null : parseFloat(item.weeklyPayment),
+                        p_shop_key: this.shopKey || null
                     });
                     if (error) return this.oops(error, 'save that change');
                     this.cacheAll();
                 },
 
                 async deleteItem(item) {
-                    const { error } = await sb.rpc('admin_delete_item', { p_id: item.id });
+                    const { error } = await sb.rpc('admin_delete_item', { p_id: item.id, p_shop_key: this.shopKey || null });
                     if (error) return this.oops(error, 'remove that product');
                     const idx = this.inventory.indexOf(item);
                     if (idx > -1) this.inventory.splice(idx, 1);
@@ -2134,7 +2197,7 @@
 
                 async importRows(rows, label) {
                     if (!rows.length) { jbToast('Nothing to import.'); return; }
-                    const { data, error } = await sb.rpc('admin_import_items', { p_rows: rows });
+                    const { data, error } = await sb.rpc('admin_import_items', { p_rows: rows, p_shop_key: this.shopKey || null });
                     if (error) return this.oops(error, 'import the stock list');
                     jbToast(`Imported ${data || 0} items ${label}.`);
                     await this.loadAll();
@@ -2267,6 +2330,23 @@
                     } finally {
                         this.staffBusy = false;
                     }
+                },
+
+                async loadShopKeyState() {
+                    const { data } = await sb.rpc('shop_key_is_set');
+                    this.shopKeyIsSet = !!data;
+                },
+
+                async saveShopKey() {
+                    if (this.newShopKey.length < 8) return jbToast('The shop key needs at least 8 characters.');
+                    const { error } = await sb.rpc('shop_key_set', {
+                        p_new_key: this.newShopKey,
+                        p_current_key: this.oldShopKey || null
+                    });
+                    if (error) return this.oops(error, 'set the shop key');
+                    this.newShopKey = ''; this.oldShopKey = '';
+                    await this.loadShopKeyState();
+                    jbToast('Shop key saved. Keep it safe - without it the platform owner cannot change your stock.');
                 },
 
                 async loadAudit() {
