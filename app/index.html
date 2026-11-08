@@ -65,10 +65,25 @@
                 <h1 class="text-lg font-bold text-slate-900">JB GADGETS STORE</h1>
                 <p class="text-[10px] tracking-[0.14em] text-slate-400 font-medium">AFFORDABILITY &amp; AUTHENTICITY</p>
             </div>
+            <div class="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+                <button type="button" @click="loginMode = 'staff'; loginError = ''"
+                        :class="loginMode === 'staff' ? 'bg-white shadow text-slate-900' : 'text-slate-500'"
+                        class="py-1.5 rounded-md transition cursor-pointer">Staff ID</button>
+                <button type="button" @click="loginMode = 'email'; loginError = ''"
+                        :class="loginMode === 'email' ? 'bg-white shadow text-slate-900' : 'text-slate-500'"
+                        class="py-1.5 rounded-md transition cursor-pointer">Email</button>
+            </div>
             <form @submit.prevent="signIn()" class="space-y-3">
-                <div>
+                <div x-show="loginMode === 'staff'">
+                    <label for="jb-staffid" class="block text-xs font-semibold text-slate-600 mb-1">Staff ID</label>
+                    <input id="jb-staffid" type="text" x-model="loginStaffId" autocomplete="username"
+                           maxlength="6" placeholder="PM4K7X"
+                           @input="loginStaffId = loginStaffId.toUpperCase()"
+                           class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 tracking-[0.25em] font-mono uppercase">
+                </div>
+                <div x-show="loginMode === 'email'">
                     <label for="jb-email" class="block text-xs font-semibold text-slate-600 mb-1">Email</label>
-                    <input id="jb-email" type="email" x-model="loginEmail" autocomplete="username" required
+                    <input id="jb-email" type="email" x-model="loginEmail" autocomplete="username"
                            class="w-full border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 <div>
@@ -86,7 +101,9 @@
                     class="w-full text-xs text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50 cursor-pointer">
                 Forgot your password?
             </button>
-            <p class="text-[11px] text-slate-400 text-center">No account? Ask the shop owner or an admin to set one up for you.</p>
+            <p class="text-[11px] text-slate-400 text-center" x-text="loginMode === 'staff'
+                ? 'Your staff ID is the six characters you were given. No account? Ask Joseph to set one up.'
+                : 'No account? Ask the shop owner or an admin to set one up for you.'"></p>
         </div>
     </div>
 
@@ -177,6 +194,9 @@
                 <button x-show="userRole === 'admin'" @click="currentTab = 'expenses'" :class="currentTab === 'expenses' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     <span>Expenses</span>
+                </button>
+                <button x-show="userRole === 'admin'" @click="currentTab = 'staff'; loadStaff()" :class="currentTab === 'staff' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <span>Staff</span>
                 </button>
                 <button x-show="userRole === 'admin'" @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
@@ -958,6 +978,138 @@
                     </div>
                 </div>
 
+                <!-- STAFF TAB -->
+                <div x-show="currentTab === 'staff'" class="space-y-6">
+
+                    <!-- shown once after a login is made, so the ID can be written down -->
+                    <template x-if="lastCreated">
+                        <div class="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-5 max-w-2xl">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <h3 class="font-bold text-emerald-900" x-text="lastCreated.fullName + ' can now sign in'"></h3>
+                                    <p class="text-xs text-emerald-800 mt-1">Write this down and hand it over. It is not shown again.</p>
+                                    <div class="mt-3 space-y-1 text-sm">
+                                        <p x-show="lastCreated.staffId">
+                                            <span class="text-slate-600">Staff ID:</span>
+                                            <span class="font-mono font-bold text-lg tracking-[0.2em] text-slate-900" x-text="lastCreated.staffId"></span>
+                                        </p>
+                                        <p x-show="lastCreated.email">
+                                            <span class="text-slate-600">Signs in with:</span>
+                                            <span class="font-medium text-slate-900" x-text="lastCreated.email"></span>
+                                        </p>
+                                        <p class="text-xs text-slate-600" x-text="'Role: ' + lastCreated.role"></p>
+                                    </div>
+                                </div>
+                                <button @click="lastCreated = null" class="text-emerald-700 hover:text-emerald-900 text-xs font-bold cursor-pointer">Done</button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl space-y-4">
+                        <h3 class="text-lg font-bold text-slate-800 border-b pb-3">Add someone to the team</h3>
+                        <form @submit.prevent="addStaff" class="space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 mb-1">Full name</label>
+                                    <input type="text" x-model="newStaff.fullName" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 mb-1">Role</label>
+                                    <select x-model="newStaff.role" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none bg-white cursor-pointer">
+                                        <option value="cashier">Cashier &mdash; signs in with a staff ID</option>
+                                        <option value="admin">Admin &mdash; signs in with an email</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div x-show="newStaff.role === 'admin'">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Email address</label>
+                                <input type="email" x-model="newStaff.email" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div x-show="newStaff.role === 'cashier'" class="bg-slate-50 border rounded-lg px-3 py-2">
+                                <p class="text-xs text-slate-600">A six-character staff ID is generated when you save. No email is collected for a cashier.</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">First password</label>
+                                <input type="text" x-model="newStaff.password" minlength="8" placeholder="At least 8 characters" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+                                <p class="text-[11px] text-slate-400 mt-1">Give it to them in person and ask them to change it.</p>
+                            </div>
+                            <button type="submit" :disabled="staffBusy" class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer"
+                                    x-text="staffBusy ? 'Working…' : 'Create the login'"></button>
+                        </form>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="text-lg font-bold text-slate-800 p-4 border-b">The team</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left min-w-[760px]">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                                        <th class="p-4">Name</th>
+                                        <th class="p-4">Signs in with</th>
+                                        <th class="p-4">Role</th>
+                                        <th class="p-4">Status</th>
+                                        <th class="p-4 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y text-sm">
+                                    <template x-for="m in staff" :key="m.id">
+                                        <tr class="hover:bg-slate-50">
+                                            <td class="p-4 font-medium text-slate-800">
+                                                <span x-text="m.fullName"></span>
+                                                <span x-show="m.isMe" class="ml-1 text-[10px] text-slate-400">(you)</span>
+                                            </td>
+                                            <td class="p-4 text-xs">
+                                                <span x-show="m.staffId" class="font-mono tracking-[0.15em] font-bold text-slate-700" x-text="m.staffId"></span>
+                                                <span x-show="!m.staffId" class="text-slate-500" x-text="m.email"></span>
+                                            </td>
+                                            <td class="p-4">
+                                                <select :value="m.role" @change="setStaffRole(m, $event.target.value)" :disabled="m.isMe"
+                                                        class="border rounded px-2 py-1 text-xs bg-white disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer">
+                                                    <option value="cashier">Cashier</option>
+                                                    <option value="admin">Admin</option>
+                                                </select>
+                                            </td>
+                                            <td class="p-4">
+                                                <span class="px-2 py-0.5 rounded text-xs font-medium border"
+                                                      :class="m.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'"
+                                                      x-text="m.isActive ? 'active' : 'switched off'"></span>
+                                            </td>
+                                            <td class="p-4 text-right whitespace-nowrap space-x-1">
+                                                <button @click="openPassword(m)" class="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 cursor-pointer">Set password</button>
+                                                <button x-show="!m.isMe && m.isActive" @click="setStaffActive(m, false)" class="text-rose-600 hover:text-rose-800 text-xs font-medium px-2 py-1 cursor-pointer">Switch off</button>
+                                                <button x-show="!m.isMe && !m.isActive" @click="setStaffActive(m, true)" class="text-emerald-600 hover:text-emerald-800 text-xs font-medium px-2 py-1 cursor-pointer">Switch on</button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <template x-if="staff.length === 0">
+                                        <tr><td colspan="5" class="p-8 text-center text-sm text-slate-400">Nobody yet.</td></tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SET A PASSWORD -->
+                <div x-show="pwFor" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click.self="closePassword()">
+                    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4">
+                        <template x-if="pwFor">
+                            <div class="space-y-4">
+                                <div>
+                                    <h3 class="text-lg font-bold text-slate-800" x-text="'New password for ' + pwFor.fullName"></h3>
+                                    <p class="text-xs text-slate-500">They can change it themselves afterwards. Hand it over in person, not by message.</p>
+                                </div>
+                                <input type="text" x-model="pwNew" minlength="8" placeholder="At least 8 characters"
+                                       class="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                <div class="flex gap-2">
+                                    <button @click="closePassword()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 rounded-lg text-sm cursor-pointer">Cancel</button>
+                                    <button @click="submitPassword()" :disabled="staffBusy" class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg text-sm cursor-pointer">Set password</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
                 <!-- 8. SETTINGS TAB -->
                 <div x-show="currentTab === 'settings'" class="space-y-6">
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl space-y-4">
@@ -975,13 +1127,79 @@
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Currency Code / Symbol</label>
                                 <input type="text" x-model="storeSettings.currency" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
                             </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 mb-1">Receipt Footer Note</label>
-                                <input type="text" x-model="storeSettings.receiptFooter" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
-                            </div>
                             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer">Save Settings</button>
                         </form>
                     </div>
+
+                    <!-- ===== THE OWNER'S OWN SETTINGS =====
+                         Not shown to an admin, and the database refuses the
+                         changes anyway, so hiding them is only the courtesy. -->
+                    <template x-if="isOwner">
+                        <div class="space-y-6">
+                            <div class="bg-white p-6 rounded-xl shadow-sm border-2 border-slate-900 max-w-2xl space-y-4">
+                                <div class="flex items-center justify-between border-b pb-3">
+                                    <h3 class="text-lg font-bold text-slate-800">Receipt Design</h3>
+                                    <span class="text-[10px] font-bold bg-slate-900 text-white px-2 py-1 rounded">OWNER ONLY</span>
+                                </div>
+                                <p class="text-xs text-slate-500 -mt-1">What prints on every receipt. Nobody else can change this, not even an admin.</p>
+                                <form @submit.prevent="saveReceiptDesign" class="space-y-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-600 mb-1">Header line</label>
+                                        <input type="text" x-model="receiptDesign.headerLine" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-600 mb-1">Under the header</label>
+                                        <input type="text" x-model="receiptDesign.subheader" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-600 mb-1">Footer note</label>
+                                        <input type="text" x-model="receiptDesign.footerText" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-600 mb-1">Hire purchase terms line</label>
+                                        <input type="text" x-model="receiptDesign.termsText" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-600 mb-1">Paper size</label>
+                                        <select x-model="receiptDesign.paperWidth" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none bg-white cursor-pointer">
+                                            <option value="58mm">58mm till roll</option>
+                                            <option value="80mm">80mm till roll</option>
+                                            <option value="A4">A4 sheet</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex flex-wrap gap-4 text-xs text-slate-700">
+                                        <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" x-model="receiptDesign.showLogo" class="rounded"><span>Show the logo</span></label>
+                                        <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" x-model="receiptDesign.showCashier" class="rounded"><span>Show who served</span></label>
+                                        <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" x-model="receiptDesign.showCustomer" class="rounded"><span>Show the customer</span></label>
+                                    </div>
+                                    <button type="submit" class="bg-slate-900 hover:bg-black text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer">Save Receipt Design</button>
+                                </form>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-xl shadow-sm border-2 border-slate-900 max-w-2xl space-y-4">
+                                <div class="flex items-center justify-between border-b pb-3">
+                                    <h3 class="text-lg font-bold text-slate-800">Shop Rules</h3>
+                                    <span class="text-[10px] font-bold bg-slate-900 text-white px-2 py-1 rounded">OWNER ONLY</span>
+                                </div>
+                                <p class="text-xs text-slate-500 -mt-1">Limits the till obeys. An admin can see them but cannot change them.</p>
+                                <form @submit.prevent="saveOwnerSettings" class="space-y-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-600 mb-1">Largest discount anyone may give (%)</label>
+                                        <input type="number" x-model="ownerSettings.maxDiscountPercent" min="0" max="100" step="0.5" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-600 mb-1">Warn when stock drops to</label>
+                                        <input type="number" x-model="ownerSettings.lowStockThreshold" min="0" step="1" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                    <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
+                                        <input type="checkbox" x-model="ownerSettings.requireNrcForHp" class="rounded">
+                                        <span>A hire purchase needs the customer's NRC or passport</span>
+                                    </label>
+                                    <button type="submit" class="bg-slate-900 hover:bg-black text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer">Save Shop Rules</button>
+                                </form>
+                            </div>
+                        </div>
+                    </template>
 
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-rose-200 max-w-2xl space-y-3">
                         <h3 class="text-lg font-bold text-slate-800 border-b pb-3">Clear Test Data</h3>
@@ -1009,10 +1227,13 @@
         <div x-show="showReceipt" class="fixed inset-0 bg-slate-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div id="printable-receipt" class="bg-white rounded-2xl p-6 max-w-xs w-full space-y-4 shadow-xl font-mono text-xs">
                 <div class="text-center border-b pb-3 border-dashed border-slate-300">
-                    <h3 class="text-base font-bold text-slate-900 tracking-wider" x-text="storeSettings.storeName">JB GADGETS STORE</h3>
-                    <p class="text-[10px] text-slate-500" x-text="storeSettings.location">Lusaka, Zambia</p>
+                    <img x-show="receiptDesign.showLogo" src="../logo-mark.png" alt="" class="h-10 w-auto mx-auto mb-1">
+                    <h3 class="text-base font-bold text-slate-900 tracking-wider" x-text="receiptDesign.headerLine">JB GADGETS STORE</h3>
+                    <p class="text-[10px] text-slate-500" x-show="receiptDesign.subheader" x-text="receiptDesign.subheader"></p>
                     <p class="text-[10px] text-slate-700 font-bold mt-1" x-text="'RECEIPT #' + currentReceipt.id"></p>
                     <p class="text-[10px] text-slate-400" x-text="currentReceipt.date"></p>
+                    <p class="text-[10px] text-slate-400" x-show="receiptDesign.showCashier && profile.full_name" x-text="'Served by ' + profile.full_name"></p>
+                    <p class="text-[10px] text-slate-400" x-show="receiptDesign.showCustomer && currentReceipt.customerName" x-text="currentReceipt.customerName"></p>
                 </div>
                 <div class="space-y-1.5 max-h-[180px] overflow-y-auto">
                     <template x-for="item in currentReceipt.items">
@@ -1054,6 +1275,7 @@
                                 <span class="font-bold" x-text="storeSettings.currency + ' ' + (currentReceipt.hirePurchase.totalPayable - currentReceipt.hirePurchase.deposit).toFixed(2)"></span>
                             </div>
                             <p class="text-[9px] text-slate-500 pt-1" x-text="'Cash price would have been ' + storeSettings.currency + ' ' + (currentReceipt.subtotal || 0).toFixed(2) + '. Plan number ' + currentReceipt.id + '.'"></p>
+                            <p class="text-[9px] text-slate-500" x-show="receiptDesign.termsText" x-text="receiptDesign.termsText"></p>
                         </div>
                     </template>
                 </div>
@@ -1134,6 +1356,13 @@
 
         // On a bad line the library may not arrive at all. Without this guard
         // the whole page would fail to start and show nothing but white.
+        // A cashier has no email. Their six-character staff ID maps onto an
+        // internal address by a fixed rule, so the app can work out the
+        // address itself and the cashier never sees one.
+        const STAFF_DOMAIN = 'staff.jbgadget.store';
+        const staffIdToEmail = id => String(id || '').trim().toUpperCase() + '@' + STAFF_DOMAIN;
+        const isStaffEmail   = e => String(e || '').toLowerCase().endsWith('@' + STAFF_DOMAIN);
+
         const sb = (window.supabase && window.supabase.createClient)
             ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
             : null;
@@ -1230,17 +1459,22 @@
                 // ---- session ----
                 stage: 'loading',            // loading | signin | pending | ready
                 profile: { full_name: '', role: 'cashier', is_active: false },
-                loginEmail: '', loginPassword: '', loginError: '', loginNote: '', busy: false,
+                loginEmail: '',
+                loginMode: 'staff',
+                loginStaffId: '', loginPassword: '', loginError: '', loginNote: '', busy: false,
                 newPassword: '', newPassword2: '',
                 online: navigator.onLine,
                 queuedSales: jbGet('jb_queued_sales') || [],
 
                 // Keeps every x-show="userRole === 'admin'" in the page working.
                 // The owner gets everything an admin gets.
+                // userRole is the permission level used all over the screens.
+                // isOwner is narrower: the things that are Boyd's alone.
                 get userRole() {
                     return (this.profile.role === 'owner' || this.profile.role === 'admin')
                         ? 'admin' : 'cashier';
                 },
+                get isOwner() { return this.profile.role === 'owner'; },
 
                 // ---- screen state ----
                 currentTab: 'dashboard',
@@ -1251,6 +1485,14 @@
                 currentReceipt: { id: '', date: '', customerName: '', items: [], total: 0, discount: 0, tradeInDevice: '', tradeInValue: 0 },
                 selectedCustomerName: '',
                 posSaleType: 'Cash',
+
+                // ---- staff ----
+                staff: [],
+                newStaff: { fullName: '', role: 'cashier', email: '', password: '' },
+                staffBusy: false,
+                lastCreated: null,          // shown once, so the ID can be written down
+                pwFor: null, pwNew: '',
+
 
                 // ---- hire purchase ----
                 hpName: '', hpPhone: '', hpNrc: '',
@@ -1271,8 +1513,16 @@
 
                 // ---- the books ----
                 storeSettings: jbGet('jb_cache_settings') || {
-                    storeName: 'JB GADGETS STORE', location: 'Lusaka, Zambia',
-                    currency: 'ZMW', receiptFooter: 'Thank you for your business!'
+                    storeName: 'JB GADGETS STORE', location: 'Lusaka, Zambia', currency: 'ZMW'
+                },
+                // Receipt wording and the shop's limits are the owner's. Staff
+                // read them so the till can obey them; only the owner saves.
+                receiptDesign: jbGet('jb_cache_receipt') || {
+                    headerLine: 'JB GADGETS STORE', subheader: '', footerText: 'Thank you for your business!',
+                    termsText: '', showLogo: true, showCashier: true, showCustomer: true, paperWidth: '80mm'
+                },
+                ownerSettings: jbGet('jb_cache_ownerset') || {
+                    maxDiscountPercent: 10, requireNrcForHp: true, lowStockThreshold: 2
                 },
                 inventory: jbGet('jb_cache_inventory') || [],
                 sales: jbGet('jb_cache_sales') || [],
@@ -1339,14 +1589,24 @@
                 async signIn() {
                     if (!sb) { this.loginError = 'Still no connection. Reload the page once you are back online.'; return; }
                     this.loginError = '';
+
+                    const byId = this.loginMode === 'staff';
+                    if (byId && !/^[A-HJ-NP-Z2-9]{6}$/i.test(this.loginStaffId.trim())) {
+                        this.loginError = 'A staff ID is six characters, like PM4K7X.';
+                        return;
+                    }
+                    const email = byId ? staffIdToEmail(this.loginStaffId)
+                                       : this.loginEmail.trim();
+
                     this.busy = true;
                     const { data, error } = await sb.auth.signInWithPassword({
-                        email: this.loginEmail.trim(), password: this.loginPassword
+                        email: email, password: this.loginPassword
                     });
                     this.busy = false;
                     if (error) {
                         this.loginError = error.message === 'Invalid login credentials'
-                            ? 'That email and password do not match an account.'
+                            ? (byId ? 'That staff ID and password do not match an account.'
+                                    : 'That email and password do not match an account.')
                             : error.message;
                         return;
                     }
@@ -1356,6 +1616,10 @@
 
                 async sendReset() {
                     if (!sb) { this.loginError = 'No connection. Try again once you are back online.'; return; }
+                    if (this.loginMode === 'staff') {
+                        this.loginError = 'A staff ID has no email to send a link to. Ask Joseph to set you a new password.';
+                        return;
+                    }
                     const email = this.loginEmail.trim();
                     if (!email) { this.loginError = 'Type your email address above first, then tap this again.'; return; }
                     this.loginError = ''; this.loginNote = ''; this.busy = true;
@@ -1405,7 +1669,7 @@
                     const catalogue = this.userRole === 'admin' ? 'inventory' : 'inventory_for_sale';
                     const lineSource = this.userRole === 'admin' ? 'sale_items' : 'sale_items_for_receipt';
 
-                    const [inv, sales, lines, rets, reps, custs, exps, setts, hp] = await Promise.all([
+                    const [inv, sales, lines, rets, reps, custs, exps, setts, hp, design, ownset] = await Promise.all([
                         sb.from(catalogue).select('*').order('name'),
                         sb.from('sales').select('*').order('sold_at', { ascending: false }).limit(2000),
                         sb.from(lineSource).select('*').limit(10000),
@@ -1416,10 +1680,12 @@
                             ? sb.from('expenses').select('*').order('spent_on', { ascending: false })
                             : Promise.resolve({ data: [], error: null }),
                         sb.from('settings').select('*').maybeSingle(),
-                        sb.from('hp_book').select('*').order('id', { ascending: false })
+                        sb.from('hp_book').select('*').order('id', { ascending: false }),
+                        sb.from('receipt_design').select('*').maybeSingle(),
+                        sb.from('owner_settings').select('*').maybeSingle()
                     ]);
 
-                    const firstError = [inv, sales, lines, rets, reps, custs, exps, setts, hp]
+                    const firstError = [inv, sales, lines, rets, reps, custs, exps, setts, hp, design, ownset]
                         .map(r => r && r.error).filter(Boolean)[0];
                     if (firstError) {
                         jbToast('Could not load everything: ' + firstError.message + '. Showing the last copy held on this device.');
@@ -1435,10 +1701,27 @@
                     this.customers = (custs.data || []);
                     this.expenses = (exps.data || []).map(toExpense);
                     this.hpBook = (hp.data || []).map(toAgreement);
+                    if (design && design.data) {
+                        const d = design.data;
+                        this.receiptDesign = {
+                            headerLine: d.header_line, subheader: d.subheader, footerText: d.footer_text,
+                            termsText: d.terms_text, showLogo: d.show_logo, showCashier: d.show_cashier,
+                            showCustomer: d.show_customer, paperWidth: d.paper_width
+                        };
+                    }
+                    if (ownset && ownset.data) {
+                        const o = ownset.data;
+                        this.ownerSettings = {
+                            maxDiscountPercent: Number(o.max_discount_percent),
+                            requireNrcForHp: o.require_nrc_for_hp,
+                            lowStockThreshold: Number(o.low_stock_threshold)
+                        };
+                    }
+                    if (this.userRole === 'admin') this.loadStaff();
                     if (setts.data) {
                         this.storeSettings = {
                             storeName: setts.data.store_name, location: setts.data.location,
-                            currency: setts.data.currency, receiptFooter: setts.data.receipt_footer
+                            currency: setts.data.currency
                         };
                     }
                     this.cacheAll();
@@ -1452,6 +1735,8 @@
                     jbSet('jb_cache_customers', this.customers);
                     jbSet('jb_cache_expenses', this.expenses);
                     jbSet('jb_cache_settings', this.storeSettings);
+                    jbSet('jb_cache_receipt', this.receiptDesign);
+                    jbSet('jb_cache_ownerset', this.ownerSettings);
                 },
 
                 // Shared handling for a failed write.
@@ -1465,12 +1750,37 @@
                         store_name: this.storeSettings.storeName,
                         location: this.storeSettings.location,
                         currency: this.storeSettings.currency,
-                        receipt_footer: this.storeSettings.receiptFooter,
                         updated_at: new Date().toISOString()
                     }).eq('id', true);
                     if (error) return this.oops(error, 'save the settings');
                     this.cacheAll();
                     jbToast('Settings saved for everyone.');
+                },
+
+                async saveReceiptDesign() {
+                    const d = this.receiptDesign;
+                    const { error } = await sb.from('receipt_design').update({
+                        header_line: d.headerLine, subheader: d.subheader, footer_text: d.footerText,
+                        terms_text: d.termsText, show_logo: d.showLogo, show_cashier: d.showCashier,
+                        show_customer: d.showCustomer, paper_width: d.paperWidth,
+                        updated_at: new Date().toISOString()
+                    }).eq('id', true);
+                    if (error) return this.oops(error, 'save the receipt design');
+                    this.cacheAll();
+                    jbToast('Receipt design saved. Every till picks it up on the next load.');
+                },
+
+                async saveOwnerSettings() {
+                    const o = this.ownerSettings;
+                    const { error } = await sb.from('owner_settings').update({
+                        max_discount_percent: parseFloat(o.maxDiscountPercent || 0),
+                        require_nrc_for_hp: !!o.requireNrcForHp,
+                        low_stock_threshold: parseInt(o.lowStockThreshold || 0, 10),
+                        updated_at: new Date().toISOString()
+                    }).eq('id', true);
+                    if (error) return this.oops(error, 'save the shop rules');
+                    this.cacheAll();
+                    jbToast('Shop rules saved.');
                 },
 
                 // ================= FIGURES =================
@@ -1621,6 +1931,134 @@
                         jbToast('Template copied. Paste it into Excel, fill in cost and quantity, save as .csv, then upload it above.');
                     } catch (e) {
                         jbToast('Could not fetch the template. Use Download Template instead.');
+                    }
+                },
+
+                // ================= STAFF =================
+                // Creating a login signs you in as the new person, which would
+                // throw Joseph out of his own session. So it is done on a second
+                // throwaway connection that keeps its session nowhere.
+                async addStaff() {
+                    const name = this.newStaff.fullName.trim();
+                    const role = this.newStaff.role;
+                    const pw   = this.newStaff.password;
+
+                    if (!name) return jbToast('Give the new person a name.');
+                    if (pw.length < 8) return jbToast('Set a first password of at least 8 characters.');
+                    if (role === 'admin' && !this.newStaff.email.trim()) {
+                        return jbToast('An admin signs in by email, so an email address is needed.');
+                    }
+
+                    this.staffBusy = true;
+                    try {
+                        // A cashier's address is derived from a staff ID the
+                        // database hands out, so ask for the ID first.
+                        let email, staffId = null;
+                        if (role === 'cashier') {
+                            const { data, error } = await sb.rpc('admin_next_staff_id');
+                            if (error) { this.oops(error, 'get a staff ID'); return; }
+                            staffId = data;
+                            email = staffIdToEmail(staffId);
+                        } else {
+                            email = this.newStaff.email.trim();
+                        }
+
+                        const tmp = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                            auth: { persistSession: false, autoRefreshToken: false, storageKey: 'jb-tmp' }
+                        });
+                        const { data: made, error: signErr } = await tmp.auth.signUp({
+                            email: email, password: pw,
+                            options: { data: { full_name: name } }
+                        });
+                        if (signErr) {
+                            this.staffBusy = false;
+                            return jbToast(/already registered/i.test(signErr.message)
+                                ? 'There is already a login for that address.'
+                                : signErr.message);
+                        }
+                        await tmp.auth.signOut().catch(() => {});
+
+                        const newId = made && made.user && made.user.id;
+                        if (!newId) { this.staffBusy = false; return jbToast('The login was made but came back without an id. Check the staff list.'); }
+
+                        const { data: reg, error: regErr } = await sb.rpc('admin_register_staff', {
+                            p_user_id: newId, p_full_name: name, p_role: role
+                        });
+                        if (regErr) { this.staffBusy = false; return this.oops(regErr, 'finish setting up the account'); }
+
+                        this.lastCreated = {
+                            fullName: name, role: role,
+                            staffId: reg ? reg.staff_id : staffId,
+                            email: role === 'admin' ? email : null
+                        };
+                        this.newStaff = { fullName: '', role: 'cashier', email: '', password: '' };
+                        await this.loadStaff();
+                    } finally {
+                        this.staffBusy = false;
+                    }
+                },
+
+                async loadStaff() {
+                    if (this.userRole !== 'admin') { this.staff = []; return; }
+                    const { data, error } = await sb.from('staff_directory')
+                        .select('*').order('role').order('full_name');
+                    if (error) { this.staff = []; return; }
+                    this.staff = (data || []).map(r => ({
+                        id: r.id, fullName: r.full_name, role: r.role,
+                        staffId: r.staff_id, email: r.email, isActive: r.is_active,
+                        isMe: r.is_me, deactivatedAt: r.deactivated_at
+                    }));
+                },
+
+                async setStaffRole(member, role) {
+                    if (role === member.role) return;
+                    const { error } = await sb.rpc('admin_set_role', { p_user_id: member.id, p_role: role });
+                    if (error) return this.oops(error, 'change the role');
+                    jbToast(member.fullName + ' is now ' + (role === 'admin' ? 'an admin' : 'a cashier') + '.');
+                    this.loadStaff();
+                },
+
+                async setStaffActive(member, active) {
+                    const { error } = await sb.rpc('admin_set_active', { p_user_id: member.id, p_active: active });
+                    if (error) return this.oops(error, active ? 'switch the account on' : 'switch the account off');
+                    jbToast(member.fullName + (active ? ' can sign in again.' : ' can no longer sign in.'));
+                    this.loadStaff();
+                },
+
+                openPassword(member) { this.pwFor = member; this.pwNew = ''; },
+                closePassword() { this.pwFor = null; this.pwNew = ''; },
+
+                // Setting somebody else's password needs the service key, which
+                // must never be in this page. It lives in a small function on
+                // the server instead; this calls it.
+                async submitPassword() {
+                    if (!this.pwFor) return;
+                    if (this.pwNew.length < 8) return jbToast('A password needs at least 8 characters.');
+                    this.staffBusy = true;
+                    try {
+                        const { data: sess } = await sb.auth.getSession();
+                        const token = sess && sess.session ? sess.session.access_token : null;
+                        if (!token) return jbToast('Your session has expired. Sign in again.');
+
+                        const res = await fetch(SUPABASE_URL + '/functions/v1/set-staff-password', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json',
+                                       'Authorization': 'Bearer ' + token,
+                                       'apikey': SUPABASE_KEY },
+                            body: JSON.stringify({ user_id: this.pwFor.id, password: this.pwNew })
+                        });
+                        const body = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                            return jbToast(res.status === 404 && /not exist/i.test(body.error || '')
+                                ? 'That account does not exist.'
+                                : (body.error || 'Could not set the password.'));
+                        }
+                        jbToast('New password set for ' + this.pwFor.fullName + '. Give it to them in person.');
+                        this.closePassword();
+                    } catch (e) {
+                        jbToast('Could not reach the password service. It may not be set up on the server yet.');
+                    } finally {
+                        this.staffBusy = false;
                     }
                 },
 
@@ -2027,7 +2465,7 @@
                     if (r.discount > 0) text += `Discount: -${this.storeSettings.currency} ${Number(r.discount).toFixed(2)}\n`;
                     text += `FINAL PAID: ${this.storeSettings.currency} ${Number(r.total).toFixed(2)}\n`;
                     text += `================================\n`;
-                    text += `  ${this.storeSettings.receiptFooter}  \n`;
+                    text += `  ${this.receiptDesign.footerText}  \n`;
                     return text;
                 },
 
