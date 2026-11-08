@@ -226,7 +226,7 @@
     <div class="max-w-[1340px] mx-auto relative min-h-[380px] sm:min-h-[480px] flex items-center">
       
       <!-- Rolling trolley, behind the text -->
-      <svg class="hero-cart" viewBox="0 0 120 72" fill="none" aria-hidden="true" focusable="false">
+      <svg class="hero-cart" viewBox="0 -14 120 86" fill="none" aria-hidden="true" focusable="false">
         <!-- whatever the trolley is carrying this trip -->
         <g id="cartCargo"></g>
         <!-- basket -->
@@ -1191,21 +1191,16 @@
     // Hero Carousel
     // ---- the trolley -------------------------------------------------
     // Each shape sits on the basket rim, drawn from its own centre.
+    // Each shape is drawn from its own foot, with the height it stands, so
+    // the loader can sink it into the basket by the right amount.
     const CART_DEVICES = [
-      // phone
-      '<rect x="-5" y="-21" width="10" height="21" rx="2.5"/><path d="M-2 -18.5 H2"/>',
-      // tablet
-      '<rect x="-7.5" y="-19" width="15" height="19" rx="2.5"/><path d="M-3 -2.5 H3"/>',
-      // headphones
-      '<path d="M-7 -5 V-11 a7 7 0 0 1 14 0 V-5"/><rect x="-9.5" y="-7" width="5" height="8" rx="2.5"/><rect x="4.5" y="-7" width="5" height="8" rx="2.5"/>',
-      // watch
-      '<rect x="-5" y="-15" width="10" height="11" rx="3"/><path d="M-2.5 -15 V-19 M2.5 -15 V-19 M-2.5 -4 V0 M2.5 -4 V0"/>',
-      // earbuds case
-      '<rect x="-6" y="-12" width="12" height="12" rx="3.5"/><path d="M-6 -6 H6"/>',
-      // power bank
-      '<rect x="-5" y="-17" width="10" height="17" rx="2"/><circle cx="0" cy="-3.5" r="1.3"/>',
-      // games controller
-      '<path d="M-8.5 -9 q-2.5 7 1.5 8.5 q3 1 4.5 -2.5 h5 q1.5 3.5 4.5 2.5 q4 -1.5 1.5 -8.5 q-2 -5 -8.5 -5 q-6.5 0 -8.5 5z"/><path d="M-4 -8 V-5 M-5.5 -6.5 H-2.5"/>'
+      { h: 21, d: '<rect x="-5" y="-21" width="10" height="21" rx="2.5"/><path d="M-2 -18.5 H2"/>' },                                                   // phone
+      { h: 19, d: '<rect x="-7.5" y="-19" width="15" height="19" rx="2.5"/><path d="M-3 -2.5 H3"/>' },                                                  // tablet
+      { h: 19, d: '<path d="M-7 -5 V-11 a7 7 0 0 1 14 0 V-5"/><rect x="-9.5" y="-7" width="5" height="8" rx="2.5"/><rect x="4.5" y="-7" width="5" height="8" rx="2.5"/>' }, // headphones
+      { h: 19, d: '<rect x="-5" y="-15" width="10" height="11" rx="3"/><path d="M-2.5 -15 V-19 M2.5 -15 V-19 M-2.5 -4 V0 M2.5 -4 V0"/>' },              // watch
+      { h: 12, d: '<rect x="-6" y="-12" width="12" height="12" rx="3.5"/><path d="M-6 -6 H6"/>' },                                                      // earbuds case
+      { h: 17, d: '<rect x="-5" y="-17" width="10" height="17" rx="2"/><circle cx="0" cy="-3.5" r="1.3"/>' },                                           // power bank
+      { h: 14, d: '<path d="M-8.5 -9 q-2.5 7 1.5 8.5 q3 1 4.5 -2.5 h5 q1.5 3.5 4.5 2.5 q4 -1.5 1.5 -8.5 q-2 -5 -8.5 -5 q-6.5 0 -8.5 5z"/><path d="M-4 -8 V-5 M-5.5 -6.5 H-2.5"/>' } // games controller
     ];
 
     function loadCart(loaded) {
@@ -1219,16 +1214,20 @@
         const j = Math.floor(Math.random() * (i + 1));
         [pool[i], pool[j]] = [pool[j], pool[i]];
       }
-      const n = 2 + Math.floor(Math.random() * 3);
+      const n = 2 + Math.floor(Math.random() * 2);   // two or three, never cluttered
       const picked = pool.slice(0, n);
-      const left = 38, right = 92, span = right - left;
+      const left = 36, right = 94, span = right - left;
+      const RIM = 16, SCALE = 1.3;   // the top edge of the basket
 
-      cargo.innerHTML = picked.map((shape, i) => {
+      cargo.innerHTML = picked.map((dev, i) => {
         const x = left + span * ((i + 0.5) / n);
-        const tilt = (Math.random() * 16 - 8).toFixed(1);
-        return `<g transform="translate(${x.toFixed(1)}, 17) rotate(${tilt})"
-                   fill="none" stroke="currentColor" stroke-width="2.4"
-                   stroke-linejoin="round" stroke-linecap="round">${shape}</g>`;
+        // drop each one in far enough to look held, with most of it
+        // still showing above the rim whatever its height
+        const y = RIM + dev.h * SCALE * 0.28;
+        const tilt = (Math.random() * 12 - 6).toFixed(1);
+        return `<g transform="translate(${x.toFixed(1)}, ${y.toFixed(1)}) rotate(${tilt}) scale(${SCALE})"
+                   fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linejoin="round" stroke-linecap="round">${dev.d}</g>`;
       }).join('');
     }
 
