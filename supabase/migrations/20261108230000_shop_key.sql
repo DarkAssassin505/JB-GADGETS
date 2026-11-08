@@ -135,8 +135,11 @@ begin
 
     select key_hash into v_hash from public.shop_key where id;
 
+    -- No key yet means the shop has not claimed its lock, so the owner
+    -- is still setting it up and may work. Everything is logged either
+    -- way. The moment a key is set, this closes for good.
     if v_hash is null then
-        raise exception 'The shop has not set its key yet. Ask the shop admin to set one before stock can be changed from here.';
+        return true;
     end if;
     if p_key is null or btrim(p_key) = '' then
         raise exception 'This shop''s stock is locked. Ask the shop admin for the shop key.';
@@ -196,7 +199,7 @@ begin
 
         perform public.audit('item added', 'inventory', v_new.id::text, v_new.name,
                  jsonb_build_object('stock', v_new.stock, 'selling_price', v_new.selling_price,
-                                    'with_shop_key', v_by_owner));
+                                    'by_platform_owner', v_by_owner));
         return v_new;
     end if;
 
@@ -219,10 +222,10 @@ begin
 
     if v_diff <> '{}'::jsonb then
         if v_by_owner then
-            v_diff := v_diff || jsonb_build_object('with_shop_key', true);
+            v_diff := v_diff || jsonb_build_object('by_platform_owner', true);
         end if;
         perform public.audit(
-            case when v_diff ? 'stock' and (select count(*) from jsonb_object_keys(v_diff - 'with_shop_key')) = 1
+            case when v_diff ? 'stock' and (select count(*) from jsonb_object_keys(v_diff - 'by_platform_owner')) = 1
                  then 'stock adjusted by hand' else 'item changed' end,
             'inventory', v_new.id::text, v_new.name, v_diff);
     end if;
@@ -253,7 +256,7 @@ begin
     perform public.audit('item removed', 'inventory', v_old.id::text, v_old.name,
              jsonb_build_object('stock_at_removal', v_old.stock,
                                 'selling_price', v_old.selling_price,
-                                'with_shop_key', public.is_owner()));
+                                'by_platform_owner', public.is_owner()));
 end;
 $$;
 
@@ -287,7 +290,7 @@ begin
     end loop;
 
     perform public.audit('stock imported', 'inventory', null, null,
-             jsonb_build_object('items', v_count, 'with_shop_key', public.is_owner()));
+             jsonb_build_object('items', v_count, 'by_platform_owner', public.is_owner()));
     return v_count;
 end;
 $$;

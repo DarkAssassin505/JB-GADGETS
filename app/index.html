@@ -1259,16 +1259,23 @@
                         <div class="bg-white p-6 rounded-xl shadow-sm border-2 border-amber-300 max-w-2xl space-y-3">
                             <div class="flex items-center justify-between border-b pb-3">
                                 <h3 class="text-lg font-bold text-slate-800">Shop Key</h3>
-                                <span class="text-[10px] font-bold bg-amber-500 text-white px-2 py-1 rounded">ASK THE SHOP</span>
+                                <span class="text-[10px] font-bold text-white px-2 py-1 rounded"
+                                      :class="shopKeyIsSet ? 'bg-amber-500' : 'bg-slate-400'"
+                                      x-text="shopKeyIsSet ? 'ASK THE SHOP' : 'NOT SET YET'"></span>
                             </div>
-                            <p class="text-sm text-slate-600">
+                            <p class="text-sm text-slate-600" x-show="shopKeyIsSet">
                                 The shop's stock, prices and costs are locked to you. To change anything, ask the shop
                                 admin for the key and type it here. It is held for this session only and is never saved.
                             </p>
-                            <input type="password" x-model="shopKey" placeholder="Shop key" autocomplete="off" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500">
+                            <p class="text-sm text-slate-600" x-show="!shopKeyIsSet">
+                                The shop has not set a key yet, so you can still set it up freely &mdash; load stock, clear
+                                it out, hand it over. The moment the shop admin sets a key, you will need it for anything
+                                to do with stock, and there is no way back from here.
+                            </p>
+                            <input x-show="shopKeyIsSet" type="password" x-model="shopKey" placeholder="Shop key" autocomplete="off" class="w-full border rounded-lg px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500">
                             <p class="text-[11px] text-slate-500">
-                                Any change you make with it is recorded in the shop's activity log as having been made
-                                with the key.
+                                Either way, anything you change is recorded in the activity log as having been done by
+                                the platform owner.
                             </p>
                         </div>
                     </template>
@@ -1392,6 +1399,35 @@
                         <button @click="clearTestTransactions()" class="bg-slate-900 hover:bg-black text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer">
                             Remove test transactions
                         </button>
+                    </div>
+                    </template>
+
+                    <template x-if="isOwner">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border-2 border-rose-300 max-w-2xl space-y-3">
+                        <div class="flex items-center justify-between border-b pb-3">
+                            <h3 class="text-lg font-bold text-slate-800">Hand the shop over</h3>
+                            <span class="text-[10px] font-bold bg-slate-900 text-white px-2 py-1 rounded">OWNER ONLY</span>
+                        </div>
+                        <p class="text-sm text-slate-600">
+                            Clears the shop out so it can be handed to its owner clean. Staff, settings, receipt design
+                            and the activity log are kept &mdash; the log is never deleted, and the reset is written into it.
+                        </p>
+                        <p class="text-xs text-slate-500">
+                            Once the shop sets its own key you will need that key to do this, same as any stock change.
+                        </p>
+                        <div class="flex flex-wrap gap-2 pt-1">
+                            <button @click="resetShop('trading')" class="bg-slate-900 hover:bg-black text-white font-medium rounded-lg px-4 py-2.5 text-sm transition cursor-pointer">
+                                Clear the trading records
+                            </button>
+                            <button @click="resetShop('everything')" class="bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-lg px-4 py-2.5 text-sm transition cursor-pointer">
+                                Clear everything
+                            </button>
+                        </div>
+                        <p class="text-[11px] text-slate-400">
+                            <span class="font-semibold">Trading records</span> leaves your stock list in place and puts back
+                            what was sold. <span class="font-semibold">Everything</span> also removes stock, customers,
+                            repairs and expenses.
+                        </p>
                     </div>
                     </template>
 
@@ -2067,6 +2103,26 @@
                     }
                 },
 
+                // ---- handing the shop over ----
+                async resetShop(scope) {
+                    const what = scope === 'everything'
+                        ? 'EVERYTHING: stock, customers, repairs, expenses, and every sale, return and plan'
+                        : 'the trading records: every sale, return and hire purchase plan (stock stays, and what was sold is put back)';
+                    if (!confirm('Clear ' + what + '?\n\n'
+                        + 'Staff, settings and the activity log are kept. This cannot be undone.\n\n'
+                        + 'Take a copy of the records first if you want one.')) return;
+                    if (prompt('Type RESET to confirm.') !== 'RESET') return jbToast('Nothing was cleared.');
+
+                    const { data, error } = await sb.rpc('owner_reset_shop', {
+                        p_scope: scope, p_shop_key: this.shopKey || null
+                    });
+                    if (error) return this.oops(error, 'reset the shop');
+                    const d = data || {};
+                    jbToast('Cleared ' + (d.sales || 0) + ' sale(s), ' + (d.plans || 0) + ' plan(s)' +
+                            (scope === 'everything' ? ' and ' + (d.items || 0) + ' stock item(s)' : '') + '.');
+                    await this.loadAll();
+                },
+
                 async clearTestTransactions() {
                     const n = this.sales.filter(s => s.isTest).length;
                     if (!n) return jbToast('There are no test transactions to remove.');
@@ -2419,11 +2475,10 @@
                             started: a.startedOn, status: a.status
                         })), ['plan','customer','phone','nrc','cashPrice','deposit','weekly','weeks','totalPayable','paid','balance','arrears','started','status'])]);
 
-                        files.push(['customers', sheet(this.customers, ['name','phone','email','notes'])]);
-                        files.push(['repairs', sheet(this.repairs, ['customer_name','device','issue','status','charge'])]);
-                        files.push(['expenses', sheet(this.expenses.map(e => ({
-                            date: e.date, category: e.category, description: e.description, amount: e.amount
-                        })), ['date','category','description','amount'])]);
+                        files.push(['customers', sheet(this.customers, ['name', 'phone', 'created_at'])]);
+                        files.push(['repairs', sheet(this.repairs,
+                            ['customer', 'phone', 'device', 'issue', 'status', 'created_at'])]);
+                        files.push(['expenses', sheet(this.expenses, ['date', 'description', 'amount'])]);
 
                         if (this.auditLog.length) {
                             files.push(['audit-log', sheet(this.auditLog.map(a => ({
