@@ -317,21 +317,17 @@
                             </form>
                         </div>
 
-                        <!-- Bulk CSV Upload & Embedded Data Import -->
+                        <!-- Bulk CSV Upload -->
                         <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
                             <div>
-                                <h3 class="text-base md:text-lg font-bold text-slate-800 mb-1">Bulk CSV & Embedded Data</h3>
-                                <p class="text-xs text-slate-500 mb-3">Load items instantly using the embedded store CSV template or upload your own file.</p>
-                                
+                                <h3 class="text-base md:text-lg font-bold text-slate-800 mb-1">Bulk CSV Upload</h3>
+                                <p class="text-xs text-slate-500 mb-3">Take the template, fill in your cost prices and quantities, then upload it below. Every cell needs a number &mdash; a blank cost or quantity makes that row be skipped.</p>
+
                                 <div class="space-y-2">
-                                    <button @click="loadEmbeddedCSV()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs py-2 px-3 rounded-lg transition flex items-center justify-center space-x-1 cursor-pointer">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                        <span>Load Embedded Inventory CSV</span>
-                                    </button>
                                     <div class="flex space-x-2">
-                                        <button @click="downloadCSVTemplate()" class="flex-1 border border-blue-600 text-blue-600 hover:bg-blue-50 font-medium text-xs py-2 px-3 rounded-lg transition cursor-pointer">
+                                        <a href="inventory-template.csv" download="JB_Inventory_Import_Template.csv" class="flex-1 border border-blue-600 text-blue-600 hover:bg-blue-50 font-medium text-xs py-2 px-3 rounded-lg transition cursor-pointer text-center">
                                             Download Template
-                                        </button>
+                                        </a>
                                         <button @click="copyCSVTemplate()" class="flex-1 border border-blue-600 text-blue-600 hover:bg-blue-50 font-medium text-xs py-2 px-3 rounded-lg transition cursor-pointer">
                                             Copy Template
                                         </button>
@@ -986,16 +982,6 @@
                 return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
             }));
 
-        // EMBEDDED DEFAULT INVENTORY CSV DATA
-        const EMBEDDED_CSV_DATA = `name,category,condition,costPrice,sellingPrice,stock
-iPhone 15 Pro Max 256GB,Phones,Brand New,21000,25000,4
-iPhone 13 128GB,Phones,Pre-Owned,9000,11500,3
-Samsung S24 Ultra,Phones,Brand New,22000,26500,2
-Huawei P50 Pro,Phones,Pre-Owned,7500,9800,2
-PlayStation 5 Slim,Consoles,Brand New,10500,13000,4
-Nintendo Switch OLED,Consoles,Pre-Owned,5000,6800,3
-AirPods Pro 2,Accessories,Brand New,3500,4500,8
-MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
 
         function storeApp() {
             return {
@@ -1330,8 +1316,6 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
                     return out;
                 },
 
-                loadEmbeddedCSV() { return this.importRows(this.parseCSV(EMBEDDED_CSV_DATA), 'from the built-in list'); },
-
                 handleCSVUpload(event) {
                     const file = event.target.files[0];
                     if (!file) return;
@@ -1343,30 +1327,25 @@ MagSafe Wireless Charger,Accessories,Brand New,600,950,15`;
                     reader.readAsText(file);
                 },
 
-                csvTemplateText() {
-                    let t = "name,category,condition,costPrice,sellingPrice,stock\n";
-                    t += "iPhone 14 Pro 128GB,Phones,Pre-Owned,11000,14000,3\n";
-                    t += "Samsung S24 Ultra,Phones,Brand New,21000,25000,2\n";
-                    t += "PS5 Controller,Accessories,Brand New,1200,1600,10\n";
-                    return t;
+                // The template is a real file next to this page, holding the
+                // current price list, so it never drifts from the shop prices.
+                async csvTemplateText() {
+                    const res = await fetch('inventory-template.csv', { cache: 'no-store' });
+                    if (!res.ok) throw new Error('template unavailable');
+                    return res.text();
                 },
 
-                downloadCSVTemplate() {
-                    const blob = new Blob([this.csvTemplateText()], { type: 'text/csv' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url; a.download = 'JB_Inventory_Import_Template.csv';
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                    setTimeout(() => URL.revokeObjectURL(url), 1000);
-                },
-
-                copyCSVTemplate() {
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(this.csvTemplateText())
-                            .then(() => jbToast('Template copied. Paste it into Excel, save as .csv, then upload it above.'))
-                            .catch(() => jbToast('Copying was blocked here. Type the column names shown in the import notes instead.'));
-                    } else {
-                        jbToast('Copying is not available here. Type the column names shown in the import notes instead.');
+                async copyCSVTemplate() {
+                    try {
+                        const text = await this.csvTemplateText();
+                        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+                            jbToast('Copying is not available here. Use Download Template instead.');
+                            return;
+                        }
+                        await navigator.clipboard.writeText(text);
+                        jbToast('Template copied. Paste it into Excel, fill in cost and quantity, save as .csv, then upload it above.');
+                    } catch (e) {
+                        jbToast('Could not fetch the template. Use Download Template instead.');
                     }
                 },
 
