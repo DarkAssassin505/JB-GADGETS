@@ -202,6 +202,9 @@
                 <button x-show="userRole === 'admin'" @click="currentTab = 'staff'; loadStaff()" :class="currentTab === 'staff' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
                     <span>Staff</span>
                 </button>
+                <button x-show="userRole === 'admin'" @click="currentTab = 'audit'; loadAudit()" :class="currentTab === 'audit' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
+                    <span>Activity Log</span>
+                </button>
                 <button x-show="userRole === 'admin'" @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'bg-blue-600 text-white' : 'text-white hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium transition text-sm cursor-pointer">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
                     <span>Settings</span>
@@ -220,7 +223,7 @@
                 <div class="flex items-center space-x-2">
                     <img src="../logo-mark.png" alt="JB Gadgets Store logo" class="h-8 w-auto md:hidden">
                     <span class="text-slate-300 md:hidden">|</span>
-                    <h2 class="text-base md:text-xl font-semibold capitalize text-slate-800" x-text="currentTab === 'pos' ? 'Point of Sale' : (currentTab === 'returns' ? 'Sales Returns' : (currentTab === 'hirepurchase' ? 'Hire Purchase' : currentTab))"></h2>
+                    <h2 class="text-base md:text-xl font-semibold capitalize text-slate-800" x-text="currentTab === 'pos' ? 'Point of Sale' : (currentTab === 'returns' ? 'Sales Returns' : (currentTab === 'hirepurchase' ? 'Hire Purchase' : (currentTab === 'audit' ? 'Activity Log' : currentTab)))"></h2>
                 </div>
                 
                 <!-- Who is signed in. The role comes from the database, not a
@@ -1134,6 +1137,61 @@
                     </div>
                 </div>
 
+                <!-- ACTIVITY LOG TAB -->
+                <div x-show="currentTab === 'audit'" class="space-y-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+                        <div class="p-4 border-b space-y-2">
+                            <h3 class="text-lg font-bold text-slate-800">What has been changed</h3>
+                            <p class="text-xs text-slate-500">
+                                Price changes, stock moved by hand, plans written off, staff added or removed, settings edited.
+                                Selling is not listed here &mdash; that is the sales records. Written by the database itself, so
+                                nobody can change or delete an entry, including you.
+                            </p>
+                            <div class="flex items-center gap-2 text-xs font-medium flex-wrap pt-1">
+                                <template x-for="f in [['all','Everything'],['inventory','Stock &amp; prices'],['staff','Staff'],['hire purchase','Plans'],['settings','Settings'],['sales','Sales history']]" :key="f[0]">
+                                    <button @click="auditFilter = f[0]"
+                                            :class="auditFilter === f[0] ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                                            class="px-3 py-1.5 rounded-full transition cursor-pointer" x-html="f[1]"></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left min-w-[860px]">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                                        <th class="p-4">When</th>
+                                        <th class="p-4">Who</th>
+                                        <th class="p-4">What</th>
+                                        <th class="p-4">Item</th>
+                                        <th class="p-4">Change</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y text-sm">
+                                    <template x-for="a in auditVisible" :key="a.id">
+                                        <tr class="hover:bg-slate-50 align-top">
+                                            <td class="p-4 text-xs text-slate-500 whitespace-nowrap" x-text="new Date(a.at).toLocaleString()"></td>
+                                            <td class="p-4">
+                                                <p class="font-medium text-slate-800 text-xs" x-text="a.actorName"></p>
+                                                <p class="text-[10px] text-slate-400" x-text="a.actorRole"></p>
+                                            </td>
+                                            <td class="p-4 text-xs">
+                                                <span class="px-2 py-0.5 rounded border text-[11px] font-medium"
+                                                      :class="/removed|cleared|written off/.test(a.action) ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-700 border-slate-200'"
+                                                      x-text="a.action"></span>
+                                            </td>
+                                            <td class="p-4 text-xs text-slate-700" x-text="a.entityName || '\u2014'"></td>
+                                            <td class="p-4 text-[11px] text-slate-500 font-mono" x-text="auditDetail(a)"></td>
+                                        </tr>
+                                    </template>
+                                    <template x-if="auditVisible.length === 0">
+                                        <tr><td colspan="5" class="p-8 text-center text-sm text-slate-400">Nothing recorded here yet.</td></tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 8. SETTINGS TAB -->
                 <div x-show="currentTab === 'settings'" class="space-y-6">
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl space-y-4">
@@ -1158,6 +1216,19 @@
                             </div>
                             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer">Save Settings</button>
                         </form>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl space-y-3">
+                        <h3 class="text-lg font-bold text-slate-800 border-b pb-3">Take a copy of your records</h3>
+                        <p class="text-sm text-slate-600">
+                            Downloads the shop's stock, sales, hire purchase plans, customers, repairs and expenses as
+                            spreadsheets you can open in Excel. They are your records and you can take them whenever you
+                            like &mdash; keep a copy somewhere safe.
+                        </p>
+                        <button @click="exportEverything()" :disabled="exporting"
+                                class="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-medium rounded-lg px-5 py-2.5 text-sm transition cursor-pointer"
+                                x-text="exporting ? 'Preparing…' : 'Download everything'"></button>
+                        <p class="text-[11px] text-slate-400">Your browser may ask permission to save several files at once.</p>
                     </div>
 
                     <!-- ===== THE OWNER'S OWN SETTINGS =====
@@ -1596,6 +1667,11 @@
                 receiptIsPreview: false,     // the slip is a preview, nothing saved yet
                 isTestSale: false,           // owner only
 
+                // ---- the audit log ----
+                auditLog: [],
+                auditFilter: 'all',
+                exporting: false,
+
                 // ---- staff ----
                 staff: [],
                 newStaff: { fullName: '', role: 'cashier', email: '', password: '' },
@@ -1631,7 +1707,7 @@
                 receiptDesign: jbGet('jb_cache_receipt') || {
                     headerLine: 'JB GADGETS STORE', subheader: '', footerText: 'Thank you for your business!',
                     termsText: '', showLogo: true, showCashier: true, showCustomer: true, paperWidth: '80mm',
-                    qrMode: 'off', qrLink: '', qrWhatsapp: '', qrLabel: 'Scan to contact us'
+                    qrMode: 'link', qrLink: 'https://www.jbgadget.store', qrWhatsapp: '', qrLabel: 'Shop with us again!'
                 },
                 ownerSettings: jbGet('jb_cache_ownerset') || {
                     requireNrcForHp: true, lowStockThreshold: 2
@@ -1831,7 +1907,7 @@
                             lowStockThreshold: Number(o.low_stock_threshold)
                         };
                     }
-                    if (this.userRole === 'admin') this.loadStaff();
+                    if (this.userRole === 'admin') { this.loadStaff(); this.loadAudit(); }
                     if (setts.data) {
                         this.storeSettings = {
                             storeName: setts.data.store_name, location: setts.data.location,
@@ -2008,19 +2084,23 @@
                 },
 
                 // ================= STOCK =================
+                // Stock is no longer written straight to the table. It goes
+                // through the database functions, which record who changed
+                // what in the audit log.
                 async addItem() {
-                    const { data, error } = await sb.from('inventory').insert({
-                        name: this.newItem.name,
-                        category: this.newItem.category,
-                        condition: this.newItem.condition,
-                        cost_price: parseFloat(this.newItem.costPrice || 0),
-                        selling_price: parseFloat(this.newItem.sellingPrice || 0),
-                        stock: parseInt(this.newItem.stock || 0, 10),
-                        first_payment:  this.newItem.firstPayment  === '' ? null : parseFloat(this.newItem.firstPayment),
-                        weekly_payment: this.newItem.weeklyPayment === '' ? null : parseFloat(this.newItem.weeklyPayment)
-                    }).select().single();
+                    const { data, error } = await sb.rpc('admin_save_item', {
+                        p_id: null,
+                        p_name: this.newItem.name,
+                        p_category: this.newItem.category,
+                        p_condition: this.newItem.condition,
+                        p_cost: parseFloat(this.newItem.costPrice || 0),
+                        p_selling: parseFloat(this.newItem.sellingPrice || 0),
+                        p_stock: parseInt(this.newItem.stock || 0, 10),
+                        p_first:  this.newItem.firstPayment  === '' ? null : parseFloat(this.newItem.firstPayment),
+                        p_weekly: this.newItem.weeklyPayment === '' ? null : parseFloat(this.newItem.weeklyPayment)
+                    });
                     if (error) return this.oops(error, 'add that product');
-                    this.inventory.push(toItem(data));
+                    if (data) this.inventory.push(toItem(data));
                     this.newItem = { name: '', category: 'Phones', condition: 'Brand New', costPrice: '', sellingPrice: '', stock: '', firstPayment: '', weeklyPayment: '' };
                     this.cacheAll();
                     jbToast('Product added.');
@@ -2029,20 +2109,23 @@
                 // Admins may correct a price or a stock count in place.
                 // Cashiers only ever see these as read-only text.
                 async updateItem(item) {
-                    const { error } = await sb.from('inventory').update({
-                        cost_price: parseFloat(item.costPrice || 0),
-                        selling_price: parseFloat(item.sellingPrice || 0),
-                        first_payment:  item.firstPayment  == null || item.firstPayment  === '' ? null : parseFloat(item.firstPayment),
-                        weekly_payment: item.weeklyPayment == null || item.weeklyPayment === '' ? null : parseFloat(item.weeklyPayment),
-                        stock: parseInt(item.stock || 0, 10),
-                        updated_at: new Date().toISOString()
-                    }).eq('id', item.id);
+                    const { error } = await sb.rpc('admin_save_item', {
+                        p_id: item.id,
+                        p_name: item.name,
+                        p_category: item.category,
+                        p_condition: item.condition,
+                        p_cost: parseFloat(item.costPrice || 0),
+                        p_selling: parseFloat(item.sellingPrice || 0),
+                        p_stock: parseInt(item.stock || 0, 10),
+                        p_first:  item.firstPayment  == null || item.firstPayment  === '' ? null : parseFloat(item.firstPayment),
+                        p_weekly: item.weeklyPayment == null || item.weeklyPayment === '' ? null : parseFloat(item.weeklyPayment)
+                    });
                     if (error) return this.oops(error, 'save that change');
                     this.cacheAll();
                 },
 
                 async deleteItem(item) {
-                    const { error } = await sb.from('inventory').delete().eq('id', item.id);
+                    const { error } = await sb.rpc('admin_delete_item', { p_id: item.id });
                     if (error) return this.oops(error, 'remove that product');
                     const idx = this.inventory.indexOf(item);
                     if (idx > -1) this.inventory.splice(idx, 1);
@@ -2051,11 +2134,10 @@
 
                 async importRows(rows, label) {
                     if (!rows.length) { jbToast('Nothing to import.'); return; }
-                    const { data, error } = await sb.from('inventory').insert(rows).select();
+                    const { data, error } = await sb.rpc('admin_import_items', { p_rows: rows });
                     if (error) return this.oops(error, 'import the stock list');
-                    (data || []).forEach(r => this.inventory.push(toItem(r)));
-                    this.cacheAll();
-                    jbToast(`Imported ${data ? data.length : 0} items ${label}.`);
+                    jbToast(`Imported ${data || 0} items ${label}.`);
+                    await this.loadAll();
                 },
 
                 parseCSV(text) {
@@ -2184,6 +2266,106 @@
                         await this.loadStaff();
                     } finally {
                         this.staffBusy = false;
+                    }
+                },
+
+                async loadAudit() {
+                    if (this.userRole !== 'admin') { this.auditLog = []; return; }
+                    const { data, error } = await sb.from('audit_log')
+                        .select('*').order('id', { ascending: false }).limit(400);
+                    if (error) { this.auditLog = []; return; }
+                    this.auditLog = (data || []).map(r => ({
+                        id: r.id, at: r.at, actorName: r.actor_name || 'system',
+                        actorRole: r.actor_role || '-', action: r.action, entity: r.entity,
+                        entityName: r.entity_name || '', detail: r.detail
+                    }));
+                },
+
+                get auditVisible() {
+                    if (this.auditFilter === 'all') return this.auditLog;
+                    return this.auditLog.filter(a => a.entity === this.auditFilter);
+                },
+
+                // Turns {field:{from,to}} into something readable.
+                auditDetail(a) {
+                    const d = a.detail;
+                    if (!d) return '';
+                    const pretty = k => k.replace(/_/g, ' ');
+                    return Object.keys(d).map(k => {
+                        const v = d[k];
+                        if (v && typeof v === 'object' && ('from' in v || 'to' in v)) {
+                            return pretty(k) + ': ' + (v.from === null ? '(none)' : v.from) +
+                                   ' \u2192 ' + (v.to === null ? '(none)' : v.to);
+                        }
+                        return pretty(k) + ': ' + v;
+                    }).join('  |  ');
+                },
+
+                // ---- taking the shop's records away ----
+                // Everything the shop owns, as spreadsheets in one zip-free
+                // download. Each file opens in Excel.
+                async exportEverything() {
+                    this.exporting = true;
+                    try {
+                        await this.loadAll();
+                        const esc = v => {
+                            if (v === null || v === undefined) return '';
+                            const s = String(v);
+                            return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+                        };
+                        const sheet = (rows, cols) =>
+                            [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n');
+
+                        const files = [];
+                        files.push(['stock', sheet(this.inventory.map(i => ({
+                            name: i.name, category: i.category, condition: i.condition,
+                            costPrice: this.userRole === 'admin' ? i.costPrice : '',
+                            sellingPrice: i.sellingPrice, stock: i.stock,
+                            firstPayment: i.firstPayment, weeklyPayment: i.weeklyPayment
+                        })), ['name','category','condition','costPrice','sellingPrice','stock','firstPayment','weeklyPayment'])]);
+
+                        files.push(['sales', sheet(this.sales.map(s => ({
+                            receipt: s.id, date: s.date, customer: s.customerName, type: s.saleType,
+                            subtotal: s.subtotal, discount: s.discount, total: s.total,
+                            returned: s.returned ? 'yes' : 'no', test: s.isTest ? 'yes' : 'no',
+                            items: (s.items || []).map(i => i.name + ' x' + i.qty).join('; ')
+                        })), ['receipt','date','customer','type','subtotal','discount','total','returned','test','items'])]);
+
+                        files.push(['hire-purchase', sheet(this.hpBook.map(a => ({
+                            plan: a.id, customer: a.customerName, phone: a.customerPhone,
+                            nrc: a.customerNrc, cashPrice: a.cashPrice, deposit: a.deposit,
+                            weekly: a.weeklyPayment, weeks: a.weeks, totalPayable: a.totalPayable,
+                            paid: a.paidToDate, balance: a.balance, arrears: a.arrears,
+                            started: a.startedOn, status: a.status
+                        })), ['plan','customer','phone','nrc','cashPrice','deposit','weekly','weeks','totalPayable','paid','balance','arrears','started','status'])]);
+
+                        files.push(['customers', sheet(this.customers, ['name','phone','email','notes'])]);
+                        files.push(['repairs', sheet(this.repairs, ['customer_name','device','issue','status','charge'])]);
+                        files.push(['expenses', sheet(this.expenses.map(e => ({
+                            date: e.date, category: e.category, description: e.description, amount: e.amount
+                        })), ['date','category','description','amount'])]);
+
+                        if (this.auditLog.length) {
+                            files.push(['audit-log', sheet(this.auditLog.map(a => ({
+                                when: a.at, who: a.actorName, role: a.actorRole,
+                                action: a.action, item: a.entityName, detail: this.auditDetail(a)
+                            })), ['when','who','role','action','item','detail'])]);
+                        }
+
+                        const stamp = new Date().toISOString().slice(0, 10);
+                        for (const [name, body] of files) {
+                            const a = document.createElement('a');
+                            a.href = URL.createObjectURL(new Blob(['\ufeff' + body], { type: 'text/csv;charset=utf-8' }));
+                            a.download = 'jbgadgets-' + name + '-' + stamp + '.csv';
+                            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                            setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+                            await new Promise(r => setTimeout(r, 350));   // browsers throttle bursts
+                        }
+                        jbToast('Exported ' + files.length + ' files. Check your downloads folder.');
+                    } catch (e) {
+                        jbToast('Could not finish the export. Try again.');
+                    } finally {
+                        this.exporting = false;
                     }
                 },
 
