@@ -1259,5 +1259,147 @@
     };
   </script>
 
+  <!-- ===================================================================
+       Counting who comes to the site
+       -------------------------------------------------------------------
+       Two numbers, for the platform owner only: how many people opened
+       the site, and how many of them went on to WhatsApp or tapped the
+       phone number. The second is the one that says whether the site is
+       earning its keep.
+
+       A visitor is a random number this browser invents for today and
+       forgets at midnight. No name, no account, nothing that could be
+       used to follow anybody - which is why there is no cookie notice.
+       Everything here is wrapped so that if the counting fails, breaks
+       or is blocked, the shop's website carries on exactly as before.
+  ==================================================================== -->
+  <script>
+  (function () {
+    'use strict';
+
+    var SB  = 'https://ririkbajiojpcrllgivn.supabase.co';
+    var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpcmlrYmFqaW9qcGNybGxnaXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwNjM4ODEsImV4cCI6MjEwOTYzOTg4MX0.J1Ms4gMI7GQJSkBy9srIXxxmA-6SjsTiygQJd0AOIeE';
+
+    // Crawlers, link previews and automated browsers are not customers.
+    try {
+      if (navigator.webdriver) return;
+      if (/bot|crawl|spider|slurp|headless|lighthouse|pingdom|preview|facebookexternalhit/i
+            .test(navigator.userAgent || '')) return;
+    } catch (e) { return; }
+
+    function today() {
+      try { return new Date().toLocaleDateString('en-CA'); } catch (e) { return 'x'; }
+    }
+
+    function visitor() {
+      var key = 'jb-visitor', now = today(), saved = null;
+      try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) {}
+      if (saved && saved.day === now && saved.id) return saved.id;
+      var id = (Math.random().toString(36).slice(2) +
+                Math.random().toString(36).slice(2)).slice(0, 18);
+      try { localStorage.setItem(key, JSON.stringify({ id: id, day: now })); } catch (e) {}
+      return id;
+    }
+
+    function device() {
+      var ua = navigator.userAgent || '';
+      if (/iPad|Tablet/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua))) return 'tablet';
+      if (/Mobi|Android|iPhone/i.test(ua)) return 'phone';
+      return 'computer';
+    }
+
+    function cameFrom() {
+      try {
+        if (!document.referrer) return '';
+        var h = new URL(document.referrer).hostname.replace(/^www\./, '');
+        return h === location.hostname.replace(/^www\./, '') ? '' : h;
+      } catch (e) { return ''; }
+    }
+
+    var me = visitor();
+
+    function send(kind, detail) {
+      try {
+        fetch(SB + '/rest/v1/rpc/record_site_event', {
+          method: 'POST',
+          keepalive: true,          // survives the jump to WhatsApp
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: KEY,
+            Authorization: 'Bearer ' + KEY
+          },
+          body: JSON.stringify({
+            p_kind: kind, p_visitor: me, p_detail: detail || null,
+            p_device: device(), p_referrer: cameFrom()
+          })
+        }).catch(function () {});
+      } catch (e) {}
+    }
+
+    // The visit itself, once somebody has actually had the page in front
+    // of them for a moment. A tab opened and abandoned is not a visitor.
+    var counted = false;
+    function countVisit() {
+      if (counted) return;
+      try { if (document.visibilityState !== 'visible') return; } catch (e) {}
+      counted = true;
+      send('visit', null);
+    }
+    try {
+      if (document.visibilityState === 'visible') {
+        setTimeout(countVisit, 2500);
+      } else {
+        document.addEventListener('visibilitychange', function () {
+          setTimeout(countVisit, 2500);
+        }, { once: true });
+      }
+    } catch (e) { setTimeout(countVisit, 2500); }
+
+    // Which phone they were asking about, read out of the WhatsApp
+    // message the button had already written for them.
+    function phoneIn(url) {
+      var msg = '';
+      try {
+        msg = decodeURIComponent(String(url).split('text=')[1] || '').replace(/\+/g, ' ');
+      } catch (e) {}
+      if (!msg) return null;
+      var low = msg.toLowerCase(), best = null;
+      try {
+        var list = (typeof phoneCatalog !== 'undefined' && phoneCatalog) ? phoneCatalog : [];
+        for (var i = 0; i < list.length; i++) {
+          var n = list[i] && list[i].name;
+          if (n && low.indexOf(String(n).toLowerCase()) !== -1) {
+            if (!best || String(n).length > best.length) best = String(n);
+          }
+        }
+      } catch (e) {}
+      return best;
+    }
+
+    function enquiry(url) { send('enquiry', phoneIn(url) || 'general enquiry'); }
+
+    // Catches every WhatsApp link, including the ones the page draws
+    // later, and a tap on the phone number as well.
+    document.addEventListener('click', function (ev) {
+      try {
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var wa = t.closest('a[href*="wa.me"]');
+        if (wa) { enquiry(wa.getAttribute('href') || ''); return; }
+        if (t.closest('a[href^="tel:"]')) send('enquiry', 'phone call');
+      } catch (e) {}
+    }, true);
+
+    // And the buttons that open WhatsApp from script rather than a link.
+    try {
+      var nativeOpen = window.open;
+      window.open = function (u) {
+        try { if (u && String(u).indexOf('wa.me') !== -1) enquiry(u); } catch (e) {}
+        return nativeOpen.apply(window, arguments);
+      };
+    } catch (e) {}
+  })();
+  </script>
+
 </body>
 </html>
