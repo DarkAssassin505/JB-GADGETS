@@ -53,11 +53,16 @@ comment on column public.site_events.detail is
 create index if not exists site_events_day_idx  on public.site_events (day desc, kind);
 create index if not exists site_events_at_idx   on public.site_events (at desc);
 
+-- The function below checks how busy one browser has been before it
+-- writes, and that check runs on every single page view, so it gets an
+-- index of its own rather than reading the whole table each time.
+create index if not exists site_events_visitor_idx on public.site_events (visitor, at desc);
+
 -- One row per browser per day per kind - and per phone, for enquiries.
 -- This is what stops a reload, or a thumb resting on a button, from
 -- turning one person into twenty.
 create unique index if not exists site_events_once
-    on public.site_events (day, kind, visitor, coalesce(detail, ''));
+    on public.site_events (day, kind, visitor, (coalesce(detail, '')));
 
 alter table public.site_events enable row level security;
 
@@ -66,9 +71,14 @@ drop policy if exists owner_read on public.site_events;
 create policy owner_read on public.site_events
     for select to authenticated using (public.is_owner());
 
--- Nothing is written directly, by anyone. The website goes through the
--- function below, which can add a row but can never read one back.
-revoke insert, update, delete on public.site_events from anon, authenticated;
+-- A policy only filters rows for someone who may touch the table at all,
+-- so the privileges are set out here rather than left to a default:
+-- signed-in people may read, and the policy above then narrows that to
+-- the owner. Nobody writes directly, and a stranger holding the public
+-- key gets nothing - they go through the function below, which can add a
+-- row and can never read one back.
+revoke all    on public.site_events from anon, authenticated;
+grant  select on public.site_events to   authenticated;
 
 
 -- ---------------------------------------------------------------------
@@ -188,13 +198,13 @@ begin
         ),
 
         'devices', (
-            select coalesce(jsonb_agg(jsonb_build_object('name', name, 'n', n)
-                                      order by n desc), '[]'::jsonb)
+            select coalesce(jsonb_agg(jsonb_build_object('name', label, 'n', hits)
+                                      order by hits desc), '[]'::jsonb)
             from (
-                select coalesce(nullif(device, ''), 'unknown') as name, count(*) as n
+                select coalesce(nullif(device, ''), 'unknown') as label, count(*) as hits
                 from public.site_events
                 where kind = 'visit' and day >= v_from
-                group by 1 order by n desc limit 6
+                group by 1 order by hits desc limit 6
             ) d
         ),
 
@@ -202,26 +212,26 @@ begin
         -- or followed a WhatsApp or SMS link, which is worth seeing on
         -- its own rather than lumped in with "unknown".
         'referrers', (
-            select coalesce(jsonb_agg(jsonb_build_object('name', name, 'n', n)
-                                      order by n desc), '[]'::jsonb)
+            select coalesce(jsonb_agg(jsonb_build_object('name', label, 'n', hits)
+                                      order by hits desc), '[]'::jsonb)
             from (
-                select coalesce(nullif(referrer, ''), 'typed in or a direct link') as name,
-                       count(*) as n
+                select coalesce(nullif(referrer, ''), 'typed in or a direct link') as label,
+                       count(*) as hits
                 from public.site_events
                 where kind = 'visit' and day >= v_from
-                group by 1 order by n desc limit 6
+                group by 1 order by hits desc limit 6
             ) r
         ),
 
         -- What they asked about, which is the list to buy more of.
         'phones', (
-            select coalesce(jsonb_agg(jsonb_build_object('name', name, 'n', n)
-                                      order by n desc), '[]'::jsonb)
+            select coalesce(jsonb_agg(jsonb_build_object('name', label, 'n', hits)
+                                      order by hits desc), '[]'::jsonb)
             from (
-                select coalesce(nullif(detail, ''), 'general enquiry') as name, count(*) as n
+                select coalesce(nullif(detail, ''), 'general enquiry') as label, count(*) as hits
                 from public.site_events
                 where kind = 'enquiry' and day >= v_from
-                group by 1 order by n desc limit 8
+                group by 1 order by hits desc limit 8
             ) p
         )
     ) into v_out;
